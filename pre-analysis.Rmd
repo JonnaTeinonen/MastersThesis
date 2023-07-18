@@ -1,0 +1,502 @@
+---
+title: "Simulation_first_draft"
+output: html_document
+date: '2023-02-28'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(car) # For Anova()
+library(nnet) # For multinom()
+```
+
+```{r}
+set.seed(13032023)
+
+# Load population file
+load("F:/Thesis Project/R code/Main_draft/population_data.RData")
+
+```
+
+
+
+
+# 1. Predictors Influence on Outcome Y
+
+Analysis of impact of X variables on Y with type II and type III Likelihood 
+Ratio Test.
+
+## 1.1. n = 50
+
+
+```{r}
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeII_p <- list() # list for p-values
+anova_typeII_LRT <- list() # list for LRT statistic
+
+# Type II test is repeated it = 300 times
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  multinom_model <- multinom(y ~ x1 + x2 + x3 + x4, data = sample_data)
+  anova_typeII_p[[i]] <- Anova(multinom_model, type = 2)$"Pr(>Chisq)" # p-value
+  anova_typeII_LRT[[i]] <- Anova(multinom_model, type = 2)$"LR Chisq" # LRT
+}
+
+anova_typeII_p <- do.call(cbind, anova_typeII_p)
+anova_typeII_p_avg <- rowMeans(anova_typeII_p) # average of the p-values
+anova_typeII_p_sd <-  apply(anova_typeII_p, 1, sd) # SD of the p-values
+# significance rate
+anova_typeII_sig  <- apply(anova_typeII_p, 1, function(x) sum(x < .05) /it)
+# average LRT statistic
+anova_typeII_LRT <- rowMeans(do.call(cbind, anova_typeII_LRT))
+
+```
+
+
+
+
+
+```{r}
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times sample is taken and ANOVA is repeated
+
+anova_typeIII_p <- list() # list for p-values
+anova_typeIII_LRT <- list() # list for LRT statistic
+
+# Type III test repeated it = 300 times
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  multinom_model <- multinom(y ~ x1 + x2 + x3 + x4, data = sample_data)
+  anova_typeIII_p[[i]] <- Anova(multinom_model, type = 3)$"Pr(>Chisq)" # p-value
+  anova_typeIII_LRT[[i]] <- Anova(multinom_model, type = 3)$"LR Chisq" # LRT
+}
+
+anova_typeIII_p <- do.call(cbind, anova_typeIII_p) 
+anova_typeIII_p_avg <- rowMeans(anova_typeIII_p) # average of the p-values
+anova_typeIII_p_sd <-  apply(anova_typeIII_p, 1, sd) # SD of the p-values
+# significance rate
+anova_typeIII_sig  <- apply(anova_typeIII_p, 1, function(x) sum(x < .05) /it)
+# average LRT statistic
+anova_typeIII_LRT <- rowMeans(do.call(cbind, anova_typeIII_LRT))
+
+```
+
+
+```{r}
+print("Results for Type II LRT")
+round(anova_typeII_p_avg, 3)
+round(anova_typeII_p_sd, 2)
+round(anova_typeII_sig, 2)  
+round(anova_typeII_LRT, 2) 
+
+print("Results for Type III LRT")
+round(anova_typeIII_p_avg, 3)
+round(anova_typeIII_p_sd, 2)
+round(anova_typeIII_sig , 2) 
+round(anova_typeIII_LRT, 2)
+```
+
+
+## 1.2. n = 1000
+
+```{r}
+set.seed(13032023)
+n <- 1000 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeII_p <- list()
+anova_typeII_LRT <- list()
+
+# Type II test repeated it = 300 times
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  multinom_model <- multinom(y ~ x1 + x2 + x3 + x4, data = sample_data)
+  anova_typeII_p[[i]] <- Anova(multinom_model, type = 2)$"Pr(>Chisq)" # p-value
+  anova_typeII_LRT[[i]] <- Anova(multinom_model, type = 2)$"LR Chisq" # LRT
+}
+
+anova_typeII_p <- do.call(cbind, anova_typeII_p)
+anova_typeII_p_avg <- rowMeans(anova_typeII_p) # average of the p-values
+anova_typeII_p_sd <-  apply(anova_typeII_p, 1, sd) # SD of the p-values
+# significance rate
+anova_typeII_sig  <- apply(anova_typeII_p, 1, function(x) sum(x < .05) /it)
+# average LRT statistic
+anova_typeII_LRT <- rowMeans(do.call(cbind, anova_typeII_LRT))
+
+```
+
+
+
+
+
+```{r}
+set.seed(13032023)
+n <- 1000 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeIII_p <- list() # list for the p-values
+anova_typeIII_LRT <- list() # list for the LRT statistic
+
+# Type II test repeated it = 300 times
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  multinom_model <- multinom(y ~ x1 + x2 + x3 + x4, data = sample_data)
+  anova_typeIII_p[[i]] <- Anova(multinom_model, type = 3)$"Pr(>Chisq)" # p-value
+  anova_typeIII_LRT[[i]] <- Anova(multinom_model, type = 3)$"LR Chisq" # LRT
+}
+
+anova_typeIII_p <- do.call(cbind, anova_typeIII_p)
+anova_typeIII_p_avg <- rowMeans(anova_typeIII_p) # average of the p-values
+anova_typeIII_p_sd <-  apply(anova_typeIII_p, 1, sd) # SD of the p-values
+# significance rate
+anova_typeIII_sig  <- apply(anova_typeIII_p, 1, function(x) sum(x < .05) /it) 
+# average LRT statistic
+anova_typeIII_LRT <- rowMeans(do.call(cbind, anova_typeIII_LRT))
+
+```
+
+
+```{r}
+print("Results for Type II LRT")
+round(anova_typeII_p_avg, 3)
+round(anova_typeII_p_sd, 2)
+round(anova_typeII_sig, 2)  
+round(anova_typeII_LRT, 2) 
+
+print("Results for Type III LRT")
+round(anova_typeIII_p_avg, 3)
+round(anova_typeIII_p_sd, 2)
+round(anova_typeIII_sig , 2) 
+round(anova_typeIII_LRT, 2)
+```
+
+
+# 2. Predictors Influence on Respomse Indicator R (when n = 50)
+
+The sample size (n) needs to be changed to study the influence of predictors
+on the response indicator in other sample sizes.
+
+### 2.1.1 Response rate approximately 60%
+
+```{r}
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeII_p_R <- list() # list of p-values
+anova_typeII_LRT_R <- list() # list of LRT statistic
+typeII_avg_response_rate <- list() # list of response rates
+
+# Type II test is repeated  it = 300 times
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  
+  # response probability for ARR 60%
+  resp_prob <- (exp(-19.3 
+                    + 1.5 * sample_data$x1 
+                    + 2.5 * sample_data$x2 
+                    + 1.2 * sample_data$x3) /
+                  (1  + exp(-19.3 
+                            + 1.5 * sample_data$x1
+                            + 2.5 * sample_data$x2 
+                            + 1.2 * sample_data$x3)))
+
+  sample_data$response <- rbinom(nrow(sample_data), 1, resp_prob)
+
+  glm_model <- glm(response ~ x1 + x2 + x3 + x4, 
+                   data = sample_data, 
+                   family = "binomial")
+  anova_typeII_p_R[[i]] <- Anova(glm_model, type = 2)$"Pr(>Chisq)" # p-value
+  anova_typeII_LRT_R[[i]] <- Anova(glm_model, type = 2)$"LR Chisq" # LRT
+  typeII_avg_response_rate[[i]] <- sum(sample_data$response) / nrow(sample_data)
+}
+
+anova_typeII_p_R <- do.call(cbind, anova_typeII_p_R)
+anova_typeII_p_avg_R <- rowMeans(anova_typeII_p_R) # average of the p-values
+anova_typeII_p_sd_R <-  apply(anova_typeII_p_R, 1, sd) # SD of the p-values
+
+# significance rate
+anova_typeII_sig_R  <- apply(anova_typeII_p_R, 1, function(x) sum(x < .05) /it)
+# average LRT statistic
+anova_typeII_LRT_R <- rowMeans(do.call(cbind, anova_typeII_LRT_R))
+# average response rate (ARR)
+typeII_avg_response_rate  <- mean(unlist(typeII_avg_response_rate)) 
+
+
+
+```
+
+
+```{r}
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeIII_p_R <- list()
+anova_typeIII_LRT_R <- list()
+typeIII_avg_response_rate <- list()
+
+# Type III test is repeated  it = 300 times
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  
+  resp_prob <- (exp(-19.3 
+                    + 1.5 * sample_data$x1 
+                    + 2.5* sample_data$x2 
+                    + 1.2 * sample_data$x3) /
+                            (1 + exp(-19.3 
+                                     + 1.5 * sample_data$x1 
+                                     + 2.5* sample_data$x2 
+                                     + 1.2 * sample_data$x3)))
+  
+  sample_data$response <- rbinom(nrow(sample_data), 1, resp_prob)
+
+  glm_model <- glm(response ~ x1 + x2 + x3 + x4, data = sample_data, 
+                   family = "binomial")
+  anova_typeIII_p_R[[i]] <- Anova(glm_model, type = 3)$"Pr(>Chisq)"
+  anova_typeIII_LRT_R[[i]] <- Anova(glm_model, type = 3)$"LR Chisq"
+  typeIII_avg_response_rate[[i]]<- sum(sample_data$response) / nrow(sample_data)
+}
+
+anova_typeIII_p_R <- do.call(cbind, anova_typeIII_p_R)
+anova_typeIII_p_avg_R <- rowMeans(anova_typeIII_p_R)
+anova_typeIII_p_sd_R <-  apply(anova_typeIII_p_R, 1, sd)
+anova_typeIII_sig_R  <- apply(anova_typeIII_p_R, 1, function(x) sum(x < .05) /it)
+anova_typeIII_LRT_R <- rowMeans(do.call(cbind, anova_typeIII_LRT_R))
+typeIII_avg_response_rate  <- mean(unlist(typeIII_avg_response_rate))
+
+```
+
+
+```{r}
+print("Results for Type II LRT")
+round(anova_typeII_p_avg_R, 3)
+round(anova_typeII_p_sd_R, 2)
+round(anova_typeII_sig_R, 2) 
+round(anova_typeII_LRT_R, 2)
+round(typeIII_avg_response_rate, 2)
+
+print("Results for Type III LRT")
+round(anova_typeIII_p_avg_R, 3)
+round(anova_typeIII_p_sd_R, 2)
+round(anova_typeIII_sig_R, 2)
+round(anova_typeIII_LRT_R, 2)
+round(typeIII_avg_response_rate, 2)
+```
+
+
+### 2.1.2 Response rate approximately 70%
+
+```{r}
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeII_p_R <- list()
+anova_typeII_LRT_R <- list()
+typeII_avg_response_rate <- list()
+
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  
+  resp_prob <-  (exp(-18.2 
+                     + 1.5 * sample_data$x1 
+                     + 2.5 * sample_data$x2 
+                     + 1.2 * sample_data$x3) /
+                            (1 + exp(-18.2 
+                                     + 1.5 * sample_data$x1 
+                                     + 2.5 * sample_data$x2 
+                                     + 1.2 * sample_data$x3)))
+
+
+
+  sample_data$response <- rbinom(nrow(sample_data), 1, resp_prob)
+
+  glm_model <- glm(response ~ x1 + x2 + x3 + x4, data = sample_data, 
+                   family = "binomial")
+  anova_typeII_p_R[[i]] <- Anova(glm_model, type = 2)$"Pr(>Chisq)"
+  anova_typeII_LRT_R[[i]] <- Anova(glm_model, type = 2)$"LR Chisq"
+  typeII_avg_response_rate[[i]]<- sum(sample_data$response) / nrow(sample_data)
+}
+
+anova_typeII_p_R <- do.call(cbind, anova_typeII_p_R)
+anova_typeII_p_avg_R <- rowMeans(anova_typeII_p_R)
+anova_typeII_p_sd_R <-  apply(anova_typeII_p_R, 1, sd)
+anova_typeII_sig_R  <- apply(anova_typeII_p_R, 1, function(x) sum(x < .05) /it)
+anova_typeII_LRT_R <- rowMeans(do.call(cbind, anova_typeII_LRT_R))
+typeII_avg_response_rate  <- mean(unlist(typeII_avg_response_rate))
+
+```
+
+
+```{r}
+
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeIII_p_R <- list()
+anova_typeIII_LRT_R <- list()
+typeIII_avg_response_rate <- list()
+
+
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  
+  resp_prob <-(exp(-18.2 
+                   + 1.5 * sample_data$x1 
+                   + 2.5 * sample_data$x2 
+                   + 1.2 * sample_data$x3) /
+                            (1 + exp(-18.2 
+                                     + 1.5 * sample_data$x1 
+                                     + 2.5 * sample_data$x2 
+                                     + 1.2 * sample_data$x3)))
+
+
+  sample_data$response <- rbinom(nrow(sample_data), 1, resp_prob)
+
+  glm_model <- glm(response ~ x1 + x2 + x3 + x4, data = sample_data, 
+                   family = "binomial")
+  anova_typeIII_p_R[[i]] <- Anova(glm_model, type = 3)$"Pr(>Chisq)"
+  anova_typeIII_LRT_R[[i]] <- Anova(glm_model, type = 3)$"LR Chisq"
+  typeIII_avg_response_rate[[i]]<- sum(sample_data$response) / nrow(sample_data)
+}
+
+anova_typeIII_p_R <- do.call(cbind, anova_typeIII_p_R)
+anova_typeIII_p_avg_R <- rowMeans(anova_typeIII_p_R)
+anova_typeIII_p_sd_R <-  apply(anova_typeIII_p_R, 1, sd)
+anova_typeIII_sig_R  <- apply(anova_typeIII_p_R, 1, function(x) sum(x < .05) /it)
+anova_typeIII_LRT_R <- rowMeans(do.call(cbind, anova_typeIII_LRT_R))
+typeIII_avg_response_rate  <- mean(unlist(typeIII_avg_response_rate))
+
+```
+
+
+```{r}
+print("Results for Type II LRT")
+round(anova_typeII_p_avg_R, 3)
+round(anova_typeII_p_sd_R, 2)
+round(anova_typeII_sig_R, 2)  
+round(anova_typeII_LRT_R, 2)
+typeIII_avg_response_rate 
+
+print("Results for Type III LRT")
+round(anova_typeIII_p_avg_R, 3)
+round(anova_typeIII_p_sd_R, 2)
+round(anova_typeIII_sig_R, 2)
+round(anova_typeIII_LRT_R, 2)
+round(typeIII_avg_response_rate, 2) 
+```
+
+
+
+### 2.1.3 Response rate approximately 80%
+
+```{r}
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeII_p_R <- list()
+anova_typeII_LRT_R <- list()
+typeII_avg_response_rate <- list()
+
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  
+  resp_prob <- (exp(-17 
+                    + 1.5 * sample_data$x1 
+                    + 2.5 * sample_data$x2 
+                    + 1.2 * sample_data$x3) /
+                          (1 + exp(-17 
+                                   + 1.5 * sample_data$x1 
+                                   + 2.5 * sample_data$x2 
+                                   + 1.2 * sample_data$x3)))
+
+
+  sample_data$response <- rbinom(nrow(sample_data), 1, resp_prob)
+
+  glm_model <- glm(response ~ x1 + x2 + x3 + x4, data = sample_data, 
+                   family = "binomial")
+  anova_typeII_p_R[[i]] <- Anova(glm_model, type = 2)$"Pr(>Chisq)"
+  anova_typeII_LRT_R[[i]] <- Anova(glm_model, type = 2)$"LR Chisq"
+  typeII_avg_response_rate[[i]]<- sum(sample_data$response) / nrow(sample_data)
+}
+
+anova_typeII_p_R <- do.call(cbind, anova_typeII_p_R)
+anova_typeII_p_avg_R <- rowMeans(anova_typeII_p_R)
+anova_typeII_p_sd_R <-  apply(anova_typeII_p_R, 1, sd)
+anova_typeII_sig_R  <- apply(anova_typeII_p_R, 1, function(x) sum(x < .05) /it)
+anova_typeII_LRT_R <- rowMeans(do.call(cbind, anova_typeII_LRT_R))
+typeII_avg_response_rate  <- mean(unlist(typeII_avg_response_rate))
+
+```
+
+
+```{r}
+
+set.seed(13032023)
+n <- 50 # sample size
+it <- 300 # number of times ANOVA is repeated
+
+anova_typeIII_p_R <- list()
+anova_typeIII_LRT_R <- list()
+typeIII_avg_response_rate <- list()
+
+
+for(i in 1:it){
+  sample_data <- population[sample(1:nrow(population), n, replace = FALSE), ]
+  
+  resp_prob <-    resp_prob <- (exp(-17
+                                    + 1.5 * sample_data$x1 
+                                    + 2.5 * sample_data$x2 
+                                    + 1.2 * sample_data$x3) /
+                          (1 + exp(-17 
+                                   + 1.5 * sample_data$x1 
+                                   + 2.5 * sample_data$x2 
+                                   + 1.2 * sample_data$x3)))
+
+
+  sample_data$response <- rbinom(nrow(sample_data), 1, resp_prob)
+
+  glm_model <- glm(response ~ x1 + x2 + x3 + x4, data = sample_data, 
+                   family = "binomial")
+  anova_typeIII_p_R[[i]] <- Anova(glm_model, type = 3)$"Pr(>Chisq)"
+  anova_typeIII_LRT_R[[i]] <- Anova(glm_model, type = 3)$"LR Chisq"
+  typeIII_avg_response_rate[[i]]<- sum(sample_data$response) / nrow(sample_data)
+}
+
+anova_typeIII_p_R <- do.call(cbind, anova_typeIII_p_R)
+anova_typeIII_p_avg_R <- rowMeans(anova_typeIII_p_R)
+anova_typeIII_p_sd_R <-  apply(anova_typeIII_p_R, 1, sd)
+anova_typeIII_sig_R  <- apply(anova_typeIII_p_R, 1, function(x) sum(x < .05) /it)
+anova_typeIII_LRT_R <- rowMeans(do.call(cbind, anova_typeIII_LRT_R))
+typeIII_avg_response_rate  <- mean(unlist(typeIII_avg_response_rate))
+
+```
+
+
+```{r}
+print("Results for Type II LRT")
+round(anova_typeII_p_avg_R, 3)
+round(anova_typeII_p_sd_R, 2)
+round(anova_typeII_sig_R, 2)  
+round(anova_typeII_LRT_R, 2)
+typeIII_avg_response_rate 
+
+print("Results for Type III LRT")
+round(anova_typeIII_p_avg_R, 3)
+round(anova_typeIII_p_sd_R, 2)
+round(anova_typeIII_sig_R, 2)
+round(anova_typeIII_LRT_R, 2)
+round(typeIII_avg_response_rate, 2) 
+```
+
+
