@@ -591,8 +591,14 @@ fun_parallel_robust <- function(x){
     MRPMMI_result,
     it_stat_info)
   
-  
-  file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Temporary_data\\parallel\\parallel_robust_results_", i, ".rds")
+  # Renaming parameters
+  i               <- x[[1]]
+  population      <- x[[2]]
+  n               <- x[[3]]
+  outcome_models  <- x[[4]]
+  response_models <- x[[5]]
+  response_rate   <- x[[6]]
+  file_name <- paste0("C:\\...\\robust\\n", n, "\\parallel_robust_results_i_", i, "_n_", n, "_RR_", response_rate, ".rds")
   
   # Saves all the results
   saveRDS(all_pooled_results, file = file_name)
@@ -788,8 +794,7 @@ fun_parallel_mice <- function(x){
     MICE_INM_result,
     it_stat_info)
   
-  
-  file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Temporary_data\\parallel\\parallel_mice_results_", i, ".rds")
+  file_name <- paste0("C:\\...\\mice\\n", n, "\\RR", response_rate, "\\parallel_mice_results__i_", i, "_n_", n, "_RR_", response_rate, ".rds")
   
   # Saves the results
   saveRDS(all_pooled_results, file = file_name)
@@ -916,9 +921,8 @@ fun_sample_proportions <- function(x){
   
   sample_proportions <- table(sample_data_n$y)/nrow(sample_data_n)
   
-  # file_name <- paste0("parallel_result_", i, ".rds")
   
-  file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Temporary_data\\sample proportions\\sample_proportions_", i, "_n", n, ".rds")
+  file_name <- paste0("C:\\...\\Imputed data\\sample proportions\\s5\\n", n, "\\RR", response_rate, "\\CCA_i_", i, "_n_", n, "_RR_", response_rate, ".rds")
   
   saveRDS(sample_proportions, file = file_name)
   

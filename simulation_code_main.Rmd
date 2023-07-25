@@ -1,0 +1,2674 @@
+---
+title: "Simulation_draft_version2"
+output: html_document
+date: '2023-03-23'
+---
+
+```{r}
+# Packages and their versions that are needed to replicate the simulation study
+# results. Used Rtools43 to build packages from source.
+
+# install.packages("devtools")
+# library("devtools")
+# install_version("backports", version = "1.4.1")
+# install_version("broom", version = "1.0.4")
+# install_version("cli", version = "3.6.1")
+# install_version("digest", version = "0.6.31")
+# install_version("dplyr", version = "1.1.2")
+# install_version("evaluate", version = "0.21")
+# install_version("fansi", version = "1.0.4")
+# install_version("fastmap", version = "1.1.1")
+# install_version("generics", version = "0.1.3")
+# install_version("glue", version = "1.6.2")
+# install_version("htmltools", version = "0.5.5")
+# install_version("lattice", version = "0.20-45")
+# install_version("lifecycle", version = "1.0.3")
+# install_version("magrittr", version = "2.0.3")
+# install_version("Matrix", version = "1.5-4")
+# install_version("pillar", version = "1.9.0")
+# install_version("purrr", version = "1.0.1")
+# install_version("R6", version = "2.5.1")
+# install_version("Rcpp", version = "1.0.10")
+# install_version("tibble", version = "3.2.1")
+# install_version("tidyr", version = "1.3.0")
+# install_version("tidyselect", version = "1.2.0")
+# install_version("utf8", version = "1.2.3")
+# install_version("vctrs", version = "0.6.2")
+# install_version("xfun", version = "0.39")
+# install_version("yaml", version = "2.3.7")
+
+
+```
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# All the libraries / packages used during the simulation
+library(nnet)                 # For fitting multinomial logistic regression
+library(mice)                 # For MICE
+library(ResourceSelection)    # For the Hosmer-Lemeshow test
+
+```
+
+```{r}
+sessionInfo()
+
+# R version 4.2.3 (2023-03-15 ucrt)
+# Platform: x86_64-w64-mingw32/x64 (64-bit)
+# Running under: Windows 10 x64 (build 19045)
+# 
+# Matrix products: default
+# 
+# locale:
+# [1] LC_COLLATE=English_Finland.utf8  LC_CTYPE=English_Finland.utf8    LC_MONETARY=English_Finland.utf8 LC_NUMERIC=C                     LC_TIME=English_Finland.utf8    
+# 
+# attached base packages:
+# [1] stats     graphics  grDevices utils     datasets  methods   base     
+# 
+# other attached packages:
+#  [1] yaml_2.3.7              xfun_0.39               vctrs_0.6.3             utf8_1.2.3              tidyselect_1.2.0        tidyr_1.3.0             tibble_3.2.1            Rcpp_1.0.11             R6_2.5.1                purrr_1.0.1             pillar_1.9.0            Matrix_1.5-4           
+# [13] magrittr_2.0.3          lifecycle_1.0.3         lattice_0.20-45         htmltools_0.5.5         glue_1.6.2              generics_0.1.3          fastmap_1.1.1           fansi_1.0.4             evaluate_0.21           dplyr_1.1.2             digest_0.6.33           cli_3.6.1              
+# [25] broom_1.0.4             backports_1.4.1         devtools_2.4.5          usethis_2.2.2           ResourceSelection_0.3-5 mice_3.15.0             nnet_7.3-19            
+# 
+# loaded via a namespace (and not attached):
+#  [1] remotes_2.4.2.1   miniUI_0.1.1.1    rlang_1.1.1       pkgbuild_1.4.2    urlchecker_1.0.1  later_1.3.1       sessioninfo_1.2.2 stringr_1.5.0     htmlwidgets_1.6.2 memoise_2.0.1     knitr_1.42        callr_3.7.3       httpuv_1.6.11     ps_1.7.5          xtable_1.8-4      promises_1.2.0.1 
+# [17] cachem_1.0.8      pkgload_1.3.2.1   mime_0.12         fs_1.6.3          stringi_1.7.12    processx_3.8.2    shiny_1.7.4.1     grid_4.2.3        tools_4.2.3       profvis_0.3.8     crayon_1.5.2      pkgconfig_2.0.3   ellipsis_0.3.2    prettyunits_1.1.1 rstudioapi_0.15.0 compiler_4.2.3  
+```
+
+
+
+
+# PART 1. Population Data Generation
+
+```{r}
+set.seed(13032023)
+
+N <- 100000 # Size of full population
+
+# Generates the auxiliary variables
+x1 <- rbinom(N, 1, 0.5)
+x2 <- rnorm(N, 4, 1)
+x3 <- rnorm(N, 8, 2)
+x4 <- rnorm(N, 3, 1) # Extra variable: used only in nonnested incorrect models
+
+# Calculated the probabilities for unit to belong to each category of Y 
+# (P(y = c)). Y = 1 is the reference category. 
+p2 <- exp(-1.6*x1 + 0.3*x2 + 0.1*x3)/ (1 + exp(-1.6*x1 + 0.3*x2 + 0.1*x3) +
+                                       exp(x1 - 1.3*x2 + 0.8*x3))
+
+p3 <- exp(x1 - 1.3*x2 + 0.8*x3)/ (1 + exp(-1.6*x1 + 0.3*x2 + 0.1*x3) +
+                                    exp(x1 - 1.3*x2 + 0.8*x3))
+
+p1 <- 1 - p2 - p3
+
+p_all <- cbind(p1, p2, p3) # Vector including all the true predictive scores
+
+
+# Generates multinomial samples for C (= 3) categories using the the true 
+# outcome probabilities. The code creates a matrix that has C rows 
+# (one for each category of Y) and each row  has N observations. If value is 1, 
+# observation belongs to that category, otherwise the value is 0. 
+y <- apply(p_all, 1, function(x) rmultinom(1, 1, x))
+
+# Create the final outcome variable: 
+y_final <- list() # List for c vectors
+
+# Loops through each category of Y
+for(i in 1: nrow(y)){
+  # If unit belongs to category c, the value is c, otherwise 0
+  c <- ifelse(y[i, ] == 1, i, 0)
+  y_final[[i]] <- c # Adds the vector c to the list
+}
+
+# Combines the vectors into a df so that each column represents the category of
+# Y and rows the units. Next, it takes the sum of each row (each row has only 
+# one number indicating the category of Y the unit belongs to) to gain one 
+# vector which includes the category number for each unit
+y <-as.factor(rowSums(do.call(cbind, y_final)))
+
+# Creates a df with the dependent and auxiliary variables: our population
+population <- cbind.data.frame(y, x1, x2, x3, x4)
+
+# Save the true population data
+save(population, file = "population_data.RData")
+```
+
+
+
+```{r}
+# True population proportions
+population_proportions <- table(population$y)/nrow(population)
+population_proportions
+```
+
+
+
+
+# PART 2. Simulation
+
+
+```{r}
+# The outcome and response models are defined for each working model scenarios
+# as they are needed for the simulation function
+
+outcome_models_s1   <-list(as.formula("y ~ x1 + x2 + x3"), 
+                           as.formula("y ~ x1 + x3"), 
+                           as.formula("y ~ x1 + x2 + x4 + x3:x4"))
+  
+response_models_s1  <- list(as.formula("response ~ x1 + x2 + x3"), 
+                            as.formula("response ~ x1 + x2"),
+                            as.formula("response ~ x1 + x3 + x4 + x2:x4"))
+  
+  
+outcome_models_s2   <-list(as.formula("y ~ x1 + x2 + x3"),
+                           as.formula("y ~ x1 + x3"), 
+                           as.formula("y ~ x1 + x2 + x4 + x3:x4"))
+  
+response_models_s2  <- list(as.formula("response ~ x1 + x2"), 
+                            as.formula("response ~ x1 + x3"),
+                            as.formula("response ~ x1 + x3 + x4 + x2:x4"))
+  
+  
+outcome_models_s3   <-list(as.formula("y ~ x1 + x3"), 
+                           as.formula("y ~ x1 + x2"), 
+                           as.formula("y ~ x1 + x2 + x4 + x3:x4"))
+  
+response_models_s3  <- list(as.formula("response ~ x1 + x2 + x3"), 
+                            as.formula("response ~ x1 + x2"),
+                            as.formula("response ~ x1 + x3 + x4 + x2:x4"))
+  
+  
+outcome_models_s4   <-list(as.formula("y ~ x1 + x3"), 
+                           as.formula("y ~ x1 + x2"), 
+                           as.formula("y ~ x2 + x3"))
+  
+response_models_s4  <- list(as.formula("response ~ x1 + x2"), 
+                            as.formula("response ~ x1 + x3"),
+                            as.formula("response ~ x2 + x3"))
+  
+  
+outcome_models_s5   <-list(as.formula("y ~ x1 + x2 + x4 + x3:x4"), 
+                           as.formula("y ~ x1 + x2 + x4"), 
+                           as.formula("y ~ x1 + x3 + x1:x4"))
+  
+response_models_s5  <- list(as.formula("response ~ x1 + x3 + x4 + x2:x4"), 
+                            as.formula("response ~ x1 + x3 + x4"),
+                            as.formula("response ~ x2 + x3 + x3:x4"))
+
+```
+
+
+
+
+
+## 2.1 Simulation With Robust Methods
+
+```{r}
+library(parallel)
+
+# Simulation function to run the robust methods in parallel.
+# Parameters:
+# 1. iterations: M = number of wanted imputed datasets
+# 2. population: The generated population with all the units
+# 3. n: sample size
+# 4. outcome_models: list of the outcome models formula
+# 5. response_models: list of the response model formulas
+# 6. RR: response rate which can be either "60", "70" or "80"
+
+sim_study_robust <- function(iterations, 
+                             population, 
+                             n, 
+                             outcome_models,
+                             response_models,
+                             RR){
+  
+  # Required R script to call the functions needed for the simulation
+  source("simulation_fun.R")
+
+
+  cores = detectCores() # Detects the number of available cores
+
+  cl <- makeCluster(detectCores() - 1, type="PSOCK") # Creates the cluster
+    
+  # List of parameter functionshe function "fun_parallell_robust" requires 
+  param_vector <- list(
+      0, # placeholder for iter no
+      population, 
+      n, 
+      outcome_models, 
+      response_models,
+      RR)
+  
+  
+  macro_config <- list() # List for the parameter vectors
+    
+    
+  # Creating parameter vector list for each iteration 
+  for(s in 1:iterations){
+    param_vector[[1]] <- s # Changes the placeholder based on iter number
+    # List that includes the required parameter vectors lists for each iteration
+    macro_config[[s]] <- param_vector
+
+  }
+    
+  # Calls the required simulation functions using the given cluster and the 
+  # different parameter vectors during each iteration
+  all_MI_methods_parallel <- parLapply(cl, macro_config, fun_parallel_robust) 
+
+   
+  stopCluster(cl)
+
+ }
+
+
+```
+
+
+### 2.1.1 Working Model Scenario 1
+
+```{r}
+# Running simulation for working model scenario 1 for all response rates and
+# sample sizes
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# Looping each sample size and response rate
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_robust( 
+        iterations = 5000, 
+        population = population, 
+        n = ss,
+        outcome_models = outcome_models_s1, 
+        response_models = response_models_s1,
+        RR = rr
+        )
+        # print("rr")
+        # print(rr)
+        # print("ss")
+        # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+# Combining the estimated parameter results for each robust method during the
+# simulation into the same file. This is repeated for all the conditions in
+# scenario 1
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+# Names for the files / variables including the estimated parameters
+result_filenames_list <- list(
+  "simulation_rr60_n50_s1_robust",
+  "simulation_rr70_n50_s1_robust",
+  "simulation_rr80_n50_s1_robust",
+  "simulation_rr60_n100_s1_robust",
+  "simulation_rr70_n100_s1_robust",
+  "simulation_rr80_n100_s1_robust",
+  "simulation_rr60_n200_s1_robust",
+  "simulation_rr70_n200_s1_robust",
+  "simulation_rr80_n200_s1_robust",
+  "simulation_rr60_n500_s1_robust",
+  "simulation_rr70_n500_s1_robust",
+  "simulation_rr80_n500_s1_robust",
+  "simulation_rr60_n1000_s1_robust",
+  "simulation_rr70_n1000_s1_robust",
+  "simulation_rr80_n1000_s1_robust")
+
+# Names for the files / variables including the error counts and average 
+# response rate for each iteration
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s1_robust_it_inf",
+  "simulation_rr70_n50_s1_robust_it_inf",
+  "simulation_rr80_n50_s1_robust_it_inf",
+  "simulation_rr60_n100_s1_robust_it_inf",
+  "simulation_rr70_n100_s1_robust_it_inf",
+  "simulation_rr80_n100_s1_robust_it_inf",
+  "simulation_rr60_n200_s1_robust_it_inf",
+  "simulation_rr70_n200_s1_robust_it_inf",
+  "simulation_rr80_n200_s1_robust_it_inf",
+  "simulation_rr60_n500_s1_robust_it_inf",
+  "simulation_rr70_n500_s1_robust_it_inf",
+  "simulation_rr80_n500_s1_robust_it_inf",
+  "simulation_rr60_n1000_s1_robust_it_inf",
+  "simulation_rr70_n1000_s1_robust_it_inf",
+  "simulation_rr80_n1000_s1_robust_it_inf")
+
+# Looping each sample size and response rate
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    # List for each robust method for the estimated parameter results
+    MRNNI_pooled_param_list <- list()
+    DRNNMI_pooled_param_list <- list()
+    MRPMMI_pooled_param_list <- list()
+    MICE_pooled_param_list <- list()
+    MCIR_PseudoR2_MF_pooled_param_list <- list()
+    MCIR_PseudoR2_CS_pooled_param_list <- list()
+    MCIR_PseudoR2_MZ_pooled_param_list <- list()
+    MCIR_PseudoR2_N_pooled_param_list <- list()
+    MCIR_AIC_pooled_param_list <- list()
+    MCIR_HL_pooled_param_list <- list()
+    it_status_inf_list <- list() # List of the HL errors and other possible errors
+    
+    # Path where the imputed data for scenario 1 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\robust\\s1\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file) # Results of all the robust methods for one iter
+    
+        MCIR_PseudoR2_MF_pooled_param_list[[iterno]] <- it_list[[1]]
+        MCIR_PseudoR2_CS_pooled_param_list[[iterno]] <- it_list[[2]]
+        MCIR_PseudoR2_MZ_pooled_param_list[[iterno]] <- it_list[[3]]
+        MCIR_PseudoR2_N_pooled_param_list[[iterno]] <- it_list[[4]]
+        MCIR_AIC_pooled_param_list[[iterno]] <- it_list[[5]]
+        MCIR_HL_pooled_param_list[[iterno]] <- it_list[[6]]
+        MRNNI_pooled_param_list[[iterno]] <- it_list[[7]]
+        DRNNMI_pooled_param_list[[iterno]]  <- it_list[[8]]
+        MRPMMI_pooled_param_list[[iterno]]  <- it_list[[9]]
+        it_status_inf_list[[iterno]] <- it_list[[10]]
+        iterno <- iterno + 1 # iteration number
+    
+    }
+    
+    # Combining the results of 5000 samples into one one list and assigning
+    # them into a corresponding variable / file as names in 
+    # "result_filennames_list"
+    assign(result_filenames_list[[iter_list]],
+           list(MCIR_PseudoR2_MF_pooled_param_list,
+                MCIR_PseudoR2_CS_pooled_param_list,
+                MCIR_PseudoR2_MZ_pooled_param_list,
+                MCIR_PseudoR2_N_pooled_param_list,
+                MCIR_AIC_pooled_param_list,
+                MCIR_HL_pooled_param_list,
+                MRNNI_pooled_param_list,
+                DRNNMI_pooled_param_list,
+                MRPMMI_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error and assigning the information into 
+     # corresponding variable / file
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s1_robust, file = "simulation_rr60_n50_s1_robust.RData")
+save(simulation_rr70_n50_s1_robust, file = "simulation_rr70_n50_s1_robust.RData")
+save(simulation_rr80_n50_s1_robust, file = "simulation_rr80_n50_s1_robust.RData")
+save(simulation_rr60_n100_s1_robust, file = "simulation_rr60_n100_s1_robust.RData")
+save(simulation_rr70_n100_s1_robust, file = "simulation_rr70_n100_s1_robust.RData")
+save(simulation_rr80_n100_s1_robust, file = "simulation_rr80_n100_s1_robust.RData")
+save(simulation_rr60_n200_s1_robust, file = "simulation_rr60_n200_s1_robust.RData")
+save(simulation_rr70_n200_s1_robust, file = "simulation_rr70_n200_s1_robust.RData")
+save(simulation_rr80_n200_s1_robust, file = "simulation_rr80_n200_s1_robust.RData")
+save(simulation_rr60_n500_s1_robust, file = "simulation_rr60_n500_s1_robust.RData")
+save(simulation_rr70_n500_s1_robust, file = "simulation_rr70_n500_s1_robust.RData")
+save(simulation_rr80_n500_s1_robust, file = "simulation_rr80_n500_s1_robust.RData")
+save(simulation_rr60_n1000_s1_robust, file = "simulation_rr60_n1000_s1_robust.RData")
+save(simulation_rr70_n1000_s1_robust, file = "simulation_rr70_n1000_s1_robust.RData")
+save(simulation_rr80_n1000_s1_robust, file = "simulation_rr80_n1000_s1_robust.RData")
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s1_robust_it_inf, file = "simulation_rr60_n50_s1_robust_it_inf.rds")
+saveRDS(simulation_rr70_n50_s1_robust_it_inf, file = "simulation_rr70_n50_s1_robust_it_inf.rds")
+saveRDS(simulation_rr80_n50_s1_robust_it_inf, file = "simulation_rr80_n50_s1_robust_it_inf.rds")
+saveRDS(simulation_rr60_n100_s1_robust_it_inf, file = "simulation_rr60_n100_s1_robust_it_inf.rds")
+saveRDS(simulation_rr70_n100_s1_robust_it_inf, file = "simulation_rr70_n100_s1_robust_it_inf.rds")
+saveRDS(simulation_rr80_n100_s1_robust_it_inf, file = "simulation_rr80_n100_s1_robust_it_inf.rds")
+saveRDS(simulation_rr60_n200_s1_robust_it_inf, file = "simulation_rr60_n200_s1_robust_it_inf.rds")
+saveRDS(simulation_rr70_n200_s1_robust_it_inf, file = "simulation_rr70_n200_s1_robust_it_inf.rds")
+saveRDS(simulation_rr80_n200_s1_robust_it_inf, file = "simulation_rr80_n200_s1_robust_it_inf.rds")
+saveRDS(simulation_rr60_n500_s1_robust_it_inf, file = "simulation_rr60_n500_s1_robust_it_inf.rds")
+saveRDS(simulation_rr70_n500_s1_robust_it_inf, file = "simulation_rr70_n500_s1_robust_it_inf.rds")
+saveRDS(simulation_rr80_n500_s1_robust_it_inf, file = "simulation_rr80_n500_s1_robust_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s1_robust_it_inf, file = "simulation_rr60_n1000_s1_robust_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s1_robust_it_inf, file = "simulation_rr70_n1000_s1_robust_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s1_robust_it_inf, file = "simulation_rr80_n1000_s1_robust_it_inf.rds")
+
+
+```
+
+
+
+
+### 2.1.2 Working Model Scenario 2
+
+```{r}
+# Running simulation for working model scenario 2 for all response rates and
+# sample sizes
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+
+for (rr in response_rates){
+  for (ss in sample_sizes){
+      sim_study_robust( 
+        iterations = 5000, 
+        population = population, 
+        n = ss,
+        outcome_models = outcome_models_s2, 
+        response_models = response_models_s2,
+        RR = rr
+        )
+        # print("rr")
+        # print(rr)
+        # print("ss")
+        # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s2_robust",
+  "simulation_rr70_n50_s2_robust",
+  "simulation_rr80_n50_s2_robust",
+  "simulation_rr60_n100_s2_robust",
+  "simulation_rr70_n100_s2_robust",
+  "simulation_rr80_n100_s2_robust",
+  "simulation_rr60_n200_s2_robust",
+  "simulation_rr70_n200_s2_robust",
+  "simulation_rr80_n200_s2_robust",
+  "simulation_rr60_n500_s2_robust",
+  "simulation_rr70_n500_s2_robust",
+  "simulation_rr80_n500_s2_robust",
+  "simulation_rr60_n1000_s2_robust",
+  "simulation_rr70_n1000_s2_robust",
+  "simulation_rr80_n1000_s2_robust"
+  )
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s2_robust_it_inf",
+  "simulation_rr70_n50_s2_robust_it_inf",
+  "simulation_rr80_n50_s2_robust_it_inf",
+  "simulation_rr60_n100_s2_robust_it_inf",
+  "simulation_rr70_n100_s2_robust_it_inf",
+  "simulation_rr80_n100_s2_robust_it_inf",
+  "simulation_rr60_n200_s2_robust_it_inf",
+  "simulation_rr70_n200_s2_robust_it_inf",
+  "simulation_rr80_n200_s2_robust_it_inf",
+  "simulation_rr60_n500_s2_robust_it_inf",
+  "simulation_rr70_n500_s2_robust_it_inf",
+  "simulation_rr80_n500_s2_robust_it_inf",
+  "simulation_rr60_n1000_s2_robust_it_inf",
+  "simulation_rr70_n1000_s2_robust_it_inf",
+  "simulation_rr80_n1000_s2_robust_it_inf"
+  )
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    
+    # List for each robust method for the estimated parameter results
+    MRNNI_pooled_param_list <- list()
+    DRNNMI_pooled_param_list <- list()
+    MRPMMI_pooled_param_list <- list()
+    MICE_pooled_param_list <- list()
+    MCIR_PseudoR2_MF_pooled_param_list <- list()
+    MCIR_PseudoR2_CS_pooled_param_list <- list()
+    MCIR_PseudoR2_MZ_pooled_param_list <- list()
+    MCIR_PseudoR2_N_pooled_param_list <- list()
+    MCIR_AIC_pooled_param_list <- list()
+    MCIR_HL_pooled_param_list <- list()
+    it_status_inf_list <- list() # List of the HL errors and other possible errors
+    
+    # Path where the imputed data for scenario 2 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\robust\\s2\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file) # Results of all the robust methods for one iter
+    
+        MCIR_PseudoR2_MF_pooled_param_list[[iterno]] <- it_list[[1]]
+        MCIR_PseudoR2_CS_pooled_param_list[[iterno]] <- it_list[[2]]
+        MCIR_PseudoR2_MZ_pooled_param_list[[iterno]] <- it_list[[3]]
+        MCIR_PseudoR2_N_pooled_param_list[[iterno]] <- it_list[[4]]
+        MCIR_AIC_pooled_param_list[[iterno]] <- it_list[[5]]
+        MCIR_HL_pooled_param_list[[iterno]] <- it_list[[6]]
+        MRNNI_pooled_param_list[[iterno]] <- it_list[[7]]
+        DRNNMI_pooled_param_list[[iterno]]  <- it_list[[8]]
+        MRPMMI_pooled_param_list[[iterno]]  <- it_list[[9]]
+        it_status_inf_list[[iterno]] <- it_list[[10]]
+        iterno <- iterno + 1 # iteration number
+    
+    }
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MCIR_PseudoR2_MF_pooled_param_list,
+                MCIR_PseudoR2_CS_pooled_param_list,
+                MCIR_PseudoR2_MZ_pooled_param_list,
+                MCIR_PseudoR2_N_pooled_param_list,
+                MCIR_AIC_pooled_param_list,
+                MCIR_HL_pooled_param_list,
+                MRNNI_pooled_param_list,
+                DRNNMI_pooled_param_list,
+                MRPMMI_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s2_robust, file = "simulation_rr60_n50_s2_robust.RData")
+save(simulation_rr70_n50_s2_robust, file = "simulation_rr70_n50_s2_robust.RData")
+save(simulation_rr80_n50_s2_robust, file = "simulation_rr80_n50_s2_robust.RData")
+save(simulation_rr60_n100_s2_robust, file = "simulation_rr60_n100_s2_robust.RData")
+save(simulation_rr70_n100_s2_robust, file = "simulation_rr70_n100_s2_robust.RData")
+save(simulation_rr80_n100_s2_robust, file = "simulation_rr80_n100_s2_robust.RData")
+save(simulation_rr60_n200_s2_robust, file = "simulation_rr60_n200_s2_robust.RData")
+save(simulation_rr70_n200_s2_robust, file = "simulation_rr70_n200_s2_robust.RData")
+save(simulation_rr80_n200_s2_robust, file = "simulation_rr80_n200_s2_robust.RData")
+save(simulation_rr60_n500_s2_robust, file = "simulation_rr60_n500_s2_robust.RData")
+save(simulation_rr70_n500_s2_robust, file = "simulation_rr70_n500_s2_robust.RData")
+save(simulation_rr80_n500_s2_robust, file = "simulation_rr80_n500_s2_robust.RData")
+save(simulation_rr60_n1000_s2_robust, file = "simulation_rr60_n1000_s2_robust.RData")
+save(simulation_rr70_n1000_s2_robust,file = "simulation_rr70_n1000_s2_robust.RData")
+save(simulation_rr80_n1000_s2_robust, file = "simulation_rr80_n1000_s2_robust.RData")
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s2_robust_it_inf, file = "simulation_rr60_n50_s2_robust_it_inf.rds")
+saveRDS(simulation_rr70_n50_s2_robust_it_inf, file = "simulation_rr70_n50_s2_robust_it_inf.rds")
+saveRDS(simulation_rr80_n50_s2_robust_it_inf, file = "simulation_rr80_n50_s2_robust_it_inf.rds")
+saveRDS(simulation_rr60_n100_s2_robust_it_inf, file = "simulation_rr60_n100_s2_robust_it_inf.rds")
+saveRDS(simulation_rr70_n100_s2_robust_it_inf, file = "simulation_rr70_n100_s2_robust_it_inf.rds")
+saveRDS(simulation_rr80_n100_s2_robust_it_inf, file = "simulation_rr80_n100_s2_robust_it_inf.rds")
+saveRDS(simulation_rr60_n200_s2_robust_it_inf, file = "simulation_rr60_n200_s2_robust_it_inf.rds")
+saveRDS(simulation_rr70_n200_s2_robust_it_inf, file = "simulation_rr70_n200_s2_robust_it_inf.rds")
+saveRDS(simulation_rr80_n200_s2_robust_it_inf, file = "simulation_rr80_n200_s2_robust_it_inf.rds")
+saveRDS(simulation_rr60_n500_s2_robust_it_inf, file = "simulation_rr60_n500_s2_robust_it_inf.rds")
+saveRDS(simulation_rr70_n500_s2_robust_it_inf, file = "simulation_rr70_n500_s2_robust_it_inf.rds")
+saveRDS(simulation_rr80_n500_s2_robust_it_inf, file = "simulation_rr80_n500_s2_robust_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s2_robust_it_inf, file = "simulation_rr60_n1000_s2_robust_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s2_robust_it_inf, file = "simulation_rr70_n1000_s2_robust_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s2_robust_it_inf, file = "simulation_rr80_n1000_s2_robust_it_inf.rds")
+
+
+```
+
+
+
+### 2.1.3 Working Model Scenario 3
+
+```{r}
+# Running simulation for working model scenario 3 for all response rates and
+# sample sizes
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+
+for (rr in response_rates)  {
+  for (ss in sample_sizes){
+      sim_study_robust( 
+        iterations = 5000, 
+        population = population, 
+        n = ss,
+        outcome_models = outcome_models_s3, 
+        response_models = response_models_s3,
+        RR = rr
+        )
+        # print("rr")
+        # print(rr)
+        # print("ss")
+        # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+s <- 3 # Working model scenario 3
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s3_robust",
+  "simulation_rr70_n50_s3_robust",
+  "simulation_rr80_n50_s3_robust",
+  "simulation_rr60_n100_s3_robust",
+  "simulation_rr70_n100_s3_robust",
+  "simulation_rr80_n100_s3_robust",
+  "simulation_rr60_n200_s3_robust",
+  "simulation_rr70_n200_s3_robust",
+  "simulation_rr80_n200_s3_robust",
+  "simulation_rr60_n500_s3_robust",
+  "simulation_rr70_n500_s3_robust",
+  "simulation_rr80_n500_s3_robust",
+  "simulation_rr60_n1000_s3_robust",
+  "simulation_rr70_n1000_s3_robust",
+  "simulation_rr80_n1000_s3_robust")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s3_robust_it_inf",
+  "simulation_rr70_n50_s3_robust_it_inf",
+  "simulation_rr80_n50_s3_robust_it_inf",
+  "simulation_rr60_n100_s3_robust_it_inf",
+  "simulation_rr70_n100_s3_robust_it_inf",
+  "simulation_rr80_n100_s3_robust_it_inf",
+  "simulation_rr60_n200_s3_robust_it_inf",
+  "simulation_rr70_n200_s3_robust_it_inf",
+  "simulation_rr80_n200_s3_robust_it_inf",
+  "simulation_rr60_n500_s3_robust_it_inf",
+  "simulation_rr70_n500_s3_robust_it_inf",
+  "simulation_rr80_n500_s3_robust_it_inf",
+  "simulation_rr60_n1000_s3_robust_it_inf",
+  "simulation_rr70_n1000_s3_robust_it_inf",
+  "simulation_rr80_n1000_s3_robust_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    # List for each robust method for the estimated parameter results
+    MRNNI_pooled_param_list <- list()
+    DRNNMI_pooled_param_list <- list()
+    MRPMMI_pooled_param_list <- list()
+    MICE_pooled_param_list <- list()
+    MCIR_PseudoR2_MF_pooled_param_list <- list()
+    MCIR_PseudoR2_CS_pooled_param_list <- list()
+    MCIR_PseudoR2_MZ_pooled_param_list <- list()
+    MCIR_PseudoR2_N_pooled_param_list <- list()
+    MCIR_AIC_pooled_param_list <- list()
+    MCIR_HL_pooled_param_list <- list()
+    it_status_inf_list <- list() # List of the HL errors and other possible errors
+    
+    # Path where the imputed data for scenario 3 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\robust\\s3\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file) # Results of all the robust methods for one iter
+    
+        MCIR_PseudoR2_MF_pooled_param_list[[iterno]] <- it_list[[1]]
+        MCIR_PseudoR2_CS_pooled_param_list[[iterno]] <- it_list[[2]]
+        MCIR_PseudoR2_MZ_pooled_param_list[[iterno]] <- it_list[[3]]
+        MCIR_PseudoR2_N_pooled_param_list[[iterno]] <- it_list[[4]]
+        MCIR_AIC_pooled_param_list[[iterno]] <- it_list[[5]]
+        MCIR_HL_pooled_param_list[[iterno]] <- it_list[[6]]
+        MRNNI_pooled_param_list[[iterno]] <- it_list[[7]]
+        DRNNMI_pooled_param_list[[iterno]]  <- it_list[[8]]
+        MRPMMI_pooled_param_list[[iterno]]  <- it_list[[9]]
+        it_status_inf_list[[iterno]] <- it_list[[10]]
+        iterno <- iterno + 1 # iteration number
+    
+    }
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MCIR_PseudoR2_MF_pooled_param_list,
+                MCIR_PseudoR2_CS_pooled_param_list,
+                MCIR_PseudoR2_MZ_pooled_param_list,
+                MCIR_PseudoR2_N_pooled_param_list,
+                MCIR_AIC_pooled_param_list,
+                MCIR_HL_pooled_param_list,
+                MRNNI_pooled_param_list,
+                DRNNMI_pooled_param_list,
+                MRPMMI_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s3_robust, file = "simulation_rr60_n50_s3_robust.RData")
+save(simulation_rr70_n50_s3_robust, file = "simulation_rr70_n50_s3_robust.RData")
+save(simulation_rr80_n50_s3_robust, file = "simulation_rr80_n50_s3_robust.RData")
+save(simulation_rr60_n100_s3_robust, file = "simulation_rr60_n100_s3_robust.RData")
+save(simulation_rr70_n100_s3_robust, file = "simulation_rr70_n100_s3_robust.RData")
+save(simulation_rr80_n100_s3_robust, file = "simulation_rr80_n100_s3_robust.RData")
+save(simulation_rr60_n200_s3_robust, file = "simulation_rr60_n200_s3_robust.RData")
+save(simulation_rr70_n200_s3_robust, file = "simulation_rr70_n200_s3_robust.RData")
+save(simulation_rr80_n200_s3_robust, file = "simulation_rr80_n200_s3_robust.RData")
+save(simulation_rr60_n500_s3_robust, file = "simulation_rr60_n500_s3_robust.RData")
+save(simulation_rr70_n500_s3_robust, file = "simulation_rr70_n500_s3_robust.RData")
+save(simulation_rr80_n500_s3_robust, file = "simulation_rr80_n500_s3_robust.RData")
+save(simulation_rr60_n1000_s3_robust, file = "simulation_rr60_n1000_s3_robust.RData")
+save(simulation_rr70_n1000_s3_robust, file = "simulation_rr70_n1000_s3_robust.RData")
+save(simulation_rr80_n1000_s3_robust, file = "simulation_rr80_n1000_s3_robust.RData")
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s3_robust_it_inf, file = "simulation_rr60_n50_s3_robust_it_inf.rds")
+saveRDS(simulation_rr70_n50_s3_robust_it_inf, file = "simulation_rr70_n50_s3_robust_it_inf.rds")
+saveRDS(simulation_rr80_n50_s3_robust_it_inf, file = "simulation_rr80_n50_s3_robust_it_inf.rds")
+saveRDS(simulation_rr60_n100_s3_robust_it_inf, file = "simulation_rr60_n100_s3_robust_it_inf.rds")
+saveRDS(simulation_rr70_n100_s3_robust_it_inf, file = "simulation_rr70_n100_s3_robust_it_inf.rds")
+saveRDS(simulation_rr80_n100_s3_robust_it_inf, file = "simulation_rr80_n100_s3_robust_it_inf.rds")
+saveRDS(simulation_rr60_n200_s3_robust_it_inf, file = "simulation_rr60_n200_s3_robust_it_inf.rds")
+saveRDS(simulation_rr70_n200_s3_robust_it_inf, file = "simulation_rr70_n200_s3_robust_it_inf.rds")
+saveRDS(simulation_rr80_n200_s3_robust_it_inf, file = "simulation_rr80_n200_s3_robust_it_inf.rds")
+saveRDS(simulation_rr60_n500_s3_robust_it_inf, file = "simulation_rr60_n500_s3_robust_it_inf.rds")
+saveRDS(simulation_rr70_n500_s3_robust_it_inf, file = "simulation_rr70_n500_s3_robust_it_inf.rds")
+saveRDS(simulation_rr80_n500_s3_robust_it_inf, file = "simulation_rr80_n500_s3_robust_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s3_robust_it_inf, file = "simulation_rr60_n1000_s3_robust_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s3_robust_it_inf, file = "simulation_rr70_n1000_s3_robust_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s3_robust_it_inf, file = "simulation_rr80_n1000_s3_robust_it_inf.rds")
+
+```
+
+
+
+
+### 2.1.4 Working Model Scenario 4
+
+```{r}
+# Running simulation for working model scenario 2 for all response rates and
+# sample sizes
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_robust( 
+        iterations = 5000, 
+        population = population, 
+        n = ss,
+        outcome_models = outcome_models_s4, 
+        response_models = response_models_s4,
+        RR = rr
+        )
+        # print("rr")
+        # print(rr)
+        # print("ss")
+        # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s4_robust",
+  "simulation_rr70_n50_s4_robust",
+  "simulation_rr80_n50_s4_robust",
+  "simulation_rr60_n100_s4_robust",
+  "simulation_rr70_n100_s4_robust",
+  "simulation_rr80_n100_s4_robust",
+  "simulation_rr60_n200_s4_robust",
+  "simulation_rr70_n200_s4_robust",
+  "simulation_rr80_n200_s4_robust",
+  "simulation_rr60_n500_s4_robust",
+  "simulation_rr70_n500_s4_robust",
+  "simulation_rr80_n500_s4_robust",
+  "simulation_rr60_n1000_s4_robust",
+  "simulation_rr70_n1000_s4_robust",
+  "simulation_rr80_n1000_s4_robust")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s4_robust_it_inf",
+  "simulation_rr70_n50_s4_robust_it_inf",
+  "simulation_rr80_n50_s4_robust_it_inf",
+  "simulation_rr60_n100_s4_robust_it_inf",
+  "simulation_rr70_n100_s4_robust_it_inf",
+  "simulation_rr80_n100_s4_robust_it_inf",
+  "simulation_rr60_n200_s4_robust_it_inf",
+  "simulation_rr70_n200_s4_robust_it_inf",
+  "simulation_rr80_n200_s4_robust_it_inf",
+  "simulation_rr60_n500_s4_robust_it_inf",
+  "simulation_rr70_n500_s4_robust_it_inf",
+  "simulation_rr80_n500_s4_robust_it_inf",
+  "simulation_rr60_n1000_s4_robust_it_inf",
+  "simulation_rr70_n1000_s4_robust_it_inf",
+  "simulation_rr80_n1000_s4_robust_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    # List for each robust method for the estimated parameter results
+    MRNNI_pooled_param_list <- list()
+    DRNNMI_pooled_param_list <- list()
+    MRPMMI_pooled_param_list <- list()
+    MICE_pooled_param_list <- list()
+    MCIR_PseudoR2_MF_pooled_param_list <- list()
+    MCIR_PseudoR2_CS_pooled_param_list <- list()
+    MCIR_PseudoR2_MZ_pooled_param_list <- list()
+    MCIR_PseudoR2_N_pooled_param_list <- list()
+    MCIR_AIC_pooled_param_list <- list()
+    MCIR_HL_pooled_param_list <- list()
+    it_status_inf_list <- list() # List of the HL errors and other possible errors
+
+    # Path where the imputed data for scenario 4 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\robust\\s4\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file) # Results of all the robust methods for one iter
+    
+        MCIR_PseudoR2_MF_pooled_param_list[[iterno]] <- it_list[[1]]
+        MCIR_PseudoR2_CS_pooled_param_list[[iterno]] <- it_list[[2]]
+        MCIR_PseudoR2_MZ_pooled_param_list[[iterno]] <- it_list[[3]]
+        MCIR_PseudoR2_N_pooled_param_list[[iterno]] <- it_list[[4]]
+        MCIR_AIC_pooled_param_list[[iterno]] <- it_list[[5]]
+        MCIR_HL_pooled_param_list[[iterno]] <- it_list[[6]]
+        MRNNI_pooled_param_list[[iterno]] <- it_list[[7]]
+        DRNNMI_pooled_param_list[[iterno]]  <- it_list[[8]]
+        MRPMMI_pooled_param_list[[iterno]]  <- it_list[[9]]
+        it_status_inf_list[[iterno]] <- it_list[[10]]
+        iterno <- iterno + 1 # iteration number
+    
+    }
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MCIR_PseudoR2_MF_pooled_param_list,
+                MCIR_PseudoR2_CS_pooled_param_list,
+                MCIR_PseudoR2_MZ_pooled_param_list,
+                MCIR_PseudoR2_N_pooled_param_list,
+                MCIR_AIC_pooled_param_list,
+                MCIR_HL_pooled_param_list,
+                MRNNI_pooled_param_list,
+                DRNNMI_pooled_param_list,
+                MRPMMI_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s4_robust, file = "simulation_rr60_n50_s4_robust.RData")
+save(simulation_rr70_n50_s4_robust, file = "simulation_rr70_n50_s4_robust.RData")
+save(simulation_rr80_n50_s4_robust, file = "simulation_rr80_n50_s4_robust.RData")
+save(simulation_rr60_n100_s4_robust, file = "simulation_rr60_n100_s4_robust.RData")
+save(simulation_rr70_n100_s4_robust, file = "simulation_rr70_n100_s4_robust.RData")
+save(simulation_rr80_n100_s4_robust, file = "simulation_rr80_n100_s4_robust.RData")
+save(simulation_rr60_n200_s4_robust, file = "simulation_rr60_n200_s4_robust.RData")
+save(simulation_rr70_n200_s4_robust, file = "simulation_rr70_n200_s4_robust.RData")
+save(simulation_rr80_n200_s4_robust, file = "simulation_rr80_n200_s4_robust.RData")
+save(simulation_rr60_n500_s4_robust, file = "simulation_rr60_n500_s4_robust.RData")
+save(simulation_rr70_n500_s4_robust, file = "simulation_rr70_n500_s4_robust.RData")
+save(simulation_rr80_n500_s4_robust, file = "simulation_rr80_n500_s4_robust.RData")
+save(simulation_rr60_n1000_s4_robust, file = "simulation_rr60_n1000_s4_robust.RData")
+save(simulation_rr70_n1000_s4_robust, file = "simulation_rr70_n1000_s4_robust.RData")
+save(simulation_rr80_n1000_s4_robust, file = "simulation_rr80_n1000_s4_robust.RData")
+
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s4_robust_it_inf, file = "simulation_rr60_n50_s4_robust_it_inf.rds")
+saveRDS(simulation_rr70_n50_s4_robust_it_inf, file = "simulation_rr70_n50_s4_robust_it_inf.rds")
+saveRDS(simulation_rr80_n50_s4_robust_it_inf, file = "simulation_rr80_n50_s4_robust_it_inf.rds")
+saveRDS(simulation_rr60_n100_s4_robust_it_inf, file = "simulation_rr60_n100_s4_robust_it_inf.rds")
+saveRDS(simulation_rr70_n100_s4_robust_it_inf, file = "simulation_rr70_n100_s4_robust_it_inf.rds")
+saveRDS(simulation_rr80_n100_s4_robust_it_inf, file = "simulation_rr80_n100_s4_robust_it_inf.rds")
+saveRDS(simulation_rr60_n200_s4_robust_it_inf, file = "simulation_rr60_n200_s4_robust_it_inf.rds")
+saveRDS(simulation_rr70_n200_s4_robust_it_inf, file = "simulation_rr70_n200_s4_robust_it_inf.rds")
+saveRDS(simulation_rr80_n200_s4_robust_it_inf, file = "simulation_rr80_n200_s4_robust_it_inf.rds")
+saveRDS(simulation_rr60_n500_s4_robust_it_inf, file = "simulation_rr60_n500_s4_robust_it_inf.rds")
+saveRDS(simulation_rr70_n500_s4_robust_it_inf, file = "simulation_rr70_n500_s4_robust_it_inf.rds")
+saveRDS(simulation_rr80_n500_s4_robust_it_inf, file = "simulation_rr80_n500_s4_robust_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s4_robust_it_inf, file = "simulation_rr60_n1000_s4_robust_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s4_robust_it_inf, file = "simulation_rr70_n1000_s4_robust_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s4_robust_it_inf, file = "simulation_rr80_n1000_s4_robust_it_inf.rds")
+
+```
+
+
+
+
+### 2.1.5 Working Model Scenario 5
+
+```{r}
+# Running simulation for working model scenario 2 for all response rates and
+# sample sizes
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_robust( 
+        iterations = 5000, 
+        population = population, 
+        n = ss,
+        outcome_models = outcome_models_s5, 
+        response_models = response_models_s5,
+        RR = rr
+        )
+        # print("rr")
+        # print(rr)
+        # print("ss")
+        # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+s <- 5 # Working model scenario 5
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s5_robust",
+  "simulation_rr70_n50_s5_robust",
+  "simulation_rr80_n50_s5_robust",
+  "simulation_rr60_n100_s5_robust",
+  "simulation_rr70_n100_s5_robust",
+  "simulation_rr80_n100_s5_robust",
+  "simulation_rr60_n200_s5_robust",
+  "simulation_rr70_n200_s5_robust",
+  "simulation_rr80_n200_s5_robust",
+  "simulation_rr60_n500_s5_robust",
+  "simulation_rr70_n500_s5_robust",
+  "simulation_rr80_n500_s5_robust",
+  "simulation_rr60_n1000_s5_robust",
+  "simulation_rr70_n1000_s5_robust",
+  "simulation_rr80_n1000_s5_robust")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s5_robust_it_inf",
+  "simulation_rr70_n50_s5_robust_it_inf",
+  "simulation_rr80_n50_s5_robust_it_inf",
+  "simulation_rr60_n100_s5_robust_it_inf",
+  "simulation_rr70_n100_s5_robust_it_inf",
+  "simulation_rr80_n100_s5_robust_it_inf",
+  "simulation_rr60_n200_s5_robust_it_inf",
+  "simulation_rr70_n200_s5_robust_it_inf",
+  "simulation_rr80_n200_s5_robust_it_inf",
+  "simulation_rr60_n500_s5_robust_it_inf",
+  "simulation_rr70_n500_s5_robust_it_inf",
+  "simulation_rr80_n500_s5_robust_it_inf",
+  "simulation_rr60_n1000_s5_robust_it_inf",
+  "simulation_rr70_n1000_s5_robust_it_inf",
+  "simulation_rr80_n1000_s5_robust_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    # List for each robust method for the estimated parameter results
+    MRNNI_pooled_param_list <- list()
+    DRNNMI_pooled_param_list <- list()
+    MRPMMI_pooled_param_list <- list()
+    MICE_pooled_param_list <- list()
+    MCIR_PseudoR2_MF_pooled_param_list <- list()
+    MCIR_PseudoR2_CS_pooled_param_list <- list()
+    MCIR_PseudoR2_MZ_pooled_param_list <- list()
+    MCIR_PseudoR2_N_pooled_param_list <- list()
+    MCIR_AIC_pooled_param_list <- list()
+    MCIR_HL_pooled_param_list <- list()
+    it_status_inf_list <- list() # List of the HL errors and other possible errors
+
+    # Path where the imputed data for scenario 5 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\robust\\s5\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file) # Results of all the robust methods for one iter
+    
+        MCIR_PseudoR2_MF_pooled_param_list[[iterno]] <- it_list[[1]]
+        MCIR_PseudoR2_CS_pooled_param_list[[iterno]] <- it_list[[2]]
+        MCIR_PseudoR2_MZ_pooled_param_list[[iterno]] <- it_list[[3]]
+        MCIR_PseudoR2_N_pooled_param_list[[iterno]] <- it_list[[4]]
+        MCIR_AIC_pooled_param_list[[iterno]] <- it_list[[5]]
+        MCIR_HL_pooled_param_list[[iterno]] <- it_list[[6]]
+        MRNNI_pooled_param_list[[iterno]] <- it_list[[7]]
+        DRNNMI_pooled_param_list[[iterno]]  <- it_list[[8]]
+        MRPMMI_pooled_param_list[[iterno]]  <- it_list[[9]]
+        it_status_inf_list[[iterno]] <- it_list[[10]]
+        iterno <- iterno + 1 # iteration number
+    
+    }
+    
+    # Combining the results of 5000 samples into one one list
+    # NOTE: name of the variable might need to be changed to match the right
+    # conditions
+    # print(result_filenames_list[[iter_list]])
+    assign(result_filenames_list[[iter_list]],
+           list(MCIR_PseudoR2_MF_pooled_param_list,
+                MCIR_PseudoR2_CS_pooled_param_list,
+                MCIR_PseudoR2_MZ_pooled_param_list,
+                MCIR_PseudoR2_N_pooled_param_list,
+                MCIR_AIC_pooled_param_list,
+                MCIR_HL_pooled_param_list,
+                MRNNI_pooled_param_list,
+                DRNNMI_pooled_param_list,
+                MRPMMI_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s5_robust, file = "simulation_rr60_n50_s5_robust.RData")
+save(simulation_rr70_n50_s5_robust, file = "simulation_rr70_n50_s5_robust.RData")
+save(simulation_rr80_n50_s5_robust, file = "simulation_rr80_n50_s5_robust.RData")
+save(simulation_rr60_n100_s5_robust, file = "simulation_rr60_n100_s5_robust.RData")
+save(simulation_rr70_n100_s5_robust, file = "simulation_rr70_n100_s5_robust.RData")
+save(simulation_rr80_n100_s5_robust, file = "simulation_rr80_n100_s5_robust.RData")
+save(simulation_rr60_n200_s5_robust, file = "simulation_rr60_n200_s5_robust.RData")
+save(simulation_rr70_n200_s5_robust, file = "simulation_rr70_n200_s5_robust.RData")
+save(simulation_rr80_n200_s5_robust, file = "simulation_rr80_n200_s5_robust.RData")
+save(simulation_rr60_n500_s5_robust, file = "simulation_rr60_n500_s5_robust.RData")
+save(simulation_rr70_n500_s5_robust, file = "simulation_rr70_n500_s5_robust.RData")
+save(simulation_rr80_n500_s5_robust, file = "simulation_rr80_n500_s5_robust.RData")
+save(simulation_rr60_n1000_s5_robust, file = "simulation_rr60_n1000_s5_robust.RData")
+save(simulation_rr70_n1000_s5_robust, file = "simulation_rr70_n1000_s5_robust.RData")
+save(simulation_rr80_n1000_s5_robust, file = "simulation_rr80_n1000_s5_robust.RData")
+
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s5_robust_it_inf, file = "simulation_rr60_n50_s5_robust_it_inf.rds")
+saveRDS(simulation_rr70_n50_s5_robust_it_inf, file = "simulation_rr70_n50_s5_robust_it_inf.rds")
+saveRDS(simulation_rr80_n50_s5_robust_it_inf, file = "simulation_rr80_n50_s5_robust_it_inf.rds")
+saveRDS(simulation_rr60_n100_s5_robust_it_inf, file = "simulation_rr60_n100_s5_robust_it_inf.rds")
+saveRDS(simulation_rr70_n100_s5_robust_it_inf, file = "simulation_rr70_n100_s5_robust_it_inf.rds")
+saveRDS(simulation_rr80_n100_s5_robust_it_inf, file = "simulation_rr80_n100_s5_robust_it_inf.rds")
+saveRDS(simulation_rr60_n200_s5_robust_it_inf, file = "simulation_rr60_n200_s5_robust_it_inf.rds")
+saveRDS(simulation_rr70_n200_s5_robust_it_inf, file = "simulation_rr70_n200_s5_robust_it_inf.rds")
+saveRDS(simulation_rr80_n200_s5_robust_it_inf, file = "simulation_rr80_n200_s5_robust_it_inf.rds")
+saveRDS(simulation_rr60_n500_s5_robust_it_inf, file = "simulation_rr60_n500_s5_robust_it_inf.rds")
+saveRDS(simulation_rr70_n500_s5_robust_it_inf, file = "simulation_rr70_n500_s5_robust_it_inf.rds")
+saveRDS(simulation_rr80_n500_s5_robust_it_inf, file = "simulation_rr80_n500_s5_robust_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s5_robust_it_inf, file = "simulation_rr60_n1000_s5_robust_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s5_robust_it_inf, file = "simulation_rr70_n1000_s5_robust_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s5_robust_it_inf, file = "simulation_rr80_n1000_s5_robust_it_inf.rds")
+
+
+```
+
+
+
+
+
+
+## 2.2 Simulation With MICE
+
+
+```{r}
+library(parallel)
+
+# Simulation function to run the MICE variants in parallel.
+# Parameters:
+# 1. iterations: M = number of wanted imputed datasets
+# 2. population: The generated population with all the units
+# 3. n: sample size
+# 4. outcome_models: list of the outcome models formula
+# 5. response_models: list of the response model formulas
+# 6. RR: response rate which can be either "60", "70" or "80"
+
+# NOTE: the outcome and response models that are given to the function are the
+# same ones as that are given to the robust methods depending on the working
+# model scenario. This is done to check the HL error so that MICE variants
+# use the same data in each working model scenario as the robust methods.
+# The models for the MICE variants are defined in the script "simulation_fun".
+
+sim_study_mice <- function(iterations,
+                           population,
+                           n,
+                           outcome_models,
+                           response_models,
+                           RR){
+  source("simulation_fun.R")
+
+
+  cores = detectCores() # Number of available cores
+
+  cl <- makeCluster(detectCores() - 1, type="PSOCK") # Creating a cluster
+
+  # Parameter vector list
+  param_vector <- list(
+    0, # placeholder for iter no
+    population,
+    n,
+    outcome_models,
+    response_models,
+    RR)
+
+  # List for all the parameter vectors lists
+  macro_config <- list()
+
+  # Creating parameter vector list for each iteration
+  for(s in 1:iterations){
+    param_vector[[1]] <- s # Changing placeholder to iter num
+    macro_config[[s]] <- param_vector
+
+  }
+
+  # Calls the required simulation functions using the given cluster
+  # and the different parameter vectors during each iteration
+  all_MI_methods_parallel <- parLapply(cl, macro_config, fun_parallel_mice)
+
+
+
+  stopCluster(cl)
+
+ }
+
+```
+
+
+### 2.2.1 Working Model Scenario 1
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# Running MICE variants for working model scenario 1 for all the sample sizes
+# and response rates
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_mice(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s1,
+        response_models = response_models_s1,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s1_MICE",
+  "simulation_rr70_n50_s1_MICE",
+  "simulation_rr80_n50_s1_MICE",
+  "simulation_rr60_n100_s1_MICE",
+  "simulation_rr70_n100_s1_MICE",
+  "simulation_rr80_n100_s1_MICE",
+  "simulation_rr60_n200_s1_MICE",
+  "simulation_rr70_n200_s1_MICE",
+  "simulation_rr80_n200_s1_MICE",
+  "simulation_rr60_n500_s1_MICE",
+  "simulation_rr70_n500_s1_MICE",
+  "simulation_rr80_n500_s1_MICE",
+  "simulation_rr60_n1000_s1_MICE",
+  "simulation_rr70_n1000_s1_MICE",
+  "simulation_rr80_n1000_s1_MICE")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s1_MICE_it_inf",
+  "simulation_rr70_n50_s1_MICE_it_inf",
+  "simulation_rr80_n50_s1_MICE_it_inf",
+  "simulation_rr60_n100_s1_MICE_it_inf",
+  "simulation_rr70_n100_s1_MICE_it_inf",
+  "simulation_rr80_n100_s1_MICE_it_inf",
+  "simulation_rr60_n200_s1_MICE_it_inf",
+  "simulation_rr70_n200_s1_MICE_it_inf",
+  "simulation_rr80_n200_s1_MICE_it_inf",
+  "simulation_rr60_n500_s1_MICE_it_inf",
+  "simulation_rr70_n500_s1_MICE_it_inf",
+  "simulation_rr80_n500_s1_MICE_it_inf",
+  "simulation_rr60_n1000_s1_MICE_it_inf",
+  "simulation_rr70_n1000_s1_MICE_it_inf",
+  "simulation_rr80_n1000_s1_MICE_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+   # List for each MICE variant for the estimated parameter results
+    MICE_default_pooled_param_list <- list()
+    MICE_CM_pooled_param_list <- list()
+    MICE_INM_pooled_param_list <- list()
+    MICE_INNM_pooled_param_list <- list()
+    it_status_inf_list <- list()
+    
+    # Path where the imputed data for scenario 1 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\mice\\s1\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file)
+    
+        MICE_default_pooled_param_list[[iterno]] <- it_list[[1]]
+        MICE_CM_pooled_param_list[[iterno]] <- it_list[[2]]
+        MICE_INM_pooled_param_list[[iterno]] <- it_list[[3]]
+        MICE_INNM_pooled_param_list[[iterno]] <- it_list[[4]]
+        it_status_inf_list[[iterno]] <- it_list[[5]]
+        iterno <- iterno + 1
+    
+    }
+
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MICE_default_pooled_param_list,
+                MICE_CM_pooled_param_list,
+                MICE_INM_pooled_param_list,
+                MICE_INNM_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s1_MICE, file = "simulation_rr60_n50_s1_MICE.RData")
+save(simulation_rr70_n50_s1_MICE, file = "simulation_rr70_n50_s1_MICE.RData")
+save(simulation_rr80_n50_s1_MICE, file = "simulation_rr80_n50_s1_MICE.RData")
+save(simulation_rr60_n100_s1_MICE, file = "simulation_rr60_n100_s1_MICE.RData")
+save(simulation_rr70_n100_s1_MICE, file = "simulation_rr70_n100_s1_MICE.RData")
+save(simulation_rr80_n100_s1_MICE, file = "simulation_rr80_n100_s1_MICE.RData")
+save(simulation_rr60_n200_s1_MICE, file = "simulation_rr60_n200_s1_MICE.RData")
+save(simulation_rr70_n200_s1_MICE, file = "simulation_rr70_n200_s1_MICE.RData")
+save(simulation_rr80_n200_s1_MICE, file = "simulation_rr80_n200_s1_MICE.RData")
+save(simulation_rr60_n500_s1_MICE, file = "simulation_rr60_n500_s1_MICE.RData")
+save(simulation_rr70_n500_s1_MICE, file = "simulation_rr70_n500_s1_MICE.RData")
+save(simulation_rr80_n500_s1_MICE, file = "simulation_rr80_n500_s1_MICE.RData")
+save(simulation_rr60_n1000_s1_MICE, file = "simulation_rr60_n1000_s1_MICE.RData")
+save(simulation_rr70_n1000_s1_MICE, file = "simulation_rr70_n1000_s1_MICE.RData")
+save(simulation_rr80_n1000_s1_MICE, file = "simulation_rr80_n1000_s1_MICE.RData")
+
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s1_MICE_it_inf, file = "simulation_rr60_n50_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n50_s1_MICE_it_inf, file = "simulation_rr70_n50_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n50_s1_MICE_it_inf, file = "simulation_rr80_n50_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n100_s1_MICE_it_inf, file = "simulation_rr60_n100_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n100_s1_MICE_it_inf, file = "simulation_rr70_n100_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n100_s1_MICE_it_inf, file = "simulation_rr80_n100_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n200_s1_MICE_it_inf, file = "simulation_rr60_n200_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n200_s1_MICE_it_inf, file = "simulation_rr70_n200_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n200_s1_MICE_it_inf, file = "simulation_rr80_n200_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n500_s1_MICE_it_inf, file = "simulation_rr60_n500_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n500_s1_MICE_it_inf, file = "simulation_rr70_n500_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n500_s1_MICE_it_inf, file = "simulation_rr80_n500_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s1_MICE_it_inf, file = "simulation_rr60_n1000_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s1_MICE_it_inf, file = "simulation_rr70_n1000_s1_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s1_MICE_it_inf, file = "simulation_rr80_n1000_s1_MICE_it_inf.rds")
+
+
+```
+
+
+
+### 2.2.2 Working Model Scenario 2
+
+```{r}
+
+# Running MICE variants for working model scenario 2 for all the sample sizes
+# and response rates
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_mice(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s2,
+        response_models = response_models_s2,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s2_MICE",
+  "simulation_rr70_n50_s2_MICE",
+  "simulation_rr80_n50_s2_MICE",
+  "simulation_rr60_n100_s2_MICE",
+  "simulation_rr70_n100_s2_MICE",
+  "simulation_rr80_n100_s2_MICE",
+  "simulation_rr60_n200_s2_MICE",
+  "simulation_rr70_n200_s2_MICE",
+  "simulation_rr80_n200_s2_MICE",
+  "simulation_rr60_n500_s2_MICE",
+  "simulation_rr70_n500_s2_MICE",
+  "simulation_rr80_n500_s2_MICE",
+  "simulation_rr60_n1000_s2_MICE",
+  "simulation_rr70_n1000_s2_MICE",
+  "simulation_rr80_n1000_s2_MICE")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s2_MICE_it_inf",
+  "simulation_rr70_n50_s2_MICE_it_inf",
+  "simulation_rr80_n50_s2_MICE_it_inf",
+  "simulation_rr60_n100_s2_MICE_it_inf",
+  "simulation_rr70_n100_s2_MICE_it_inf",
+  "simulation_rr80_n100_s2_MICE_it_inf",
+  "simulation_rr60_n200_s2_MICE_it_inf",
+  "simulation_rr70_n200_s2_MICE_it_inf",
+  "simulation_rr80_n200_s2_MICE_it_inf",
+  "simulation_rr60_n500_s2_MICE_it_inf",
+  "simulation_rr70_n500_s2_MICE_it_inf",
+  "simulation_rr80_n500_s2_MICE_it_inf",
+  "simulation_rr60_n1000_s2_MICE_it_inf",
+  "simulation_rr70_n1000_s2_MICE_it_inf",
+  "simulation_rr80_n1000_s2_MICE_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+   # List for each MICE variant for the estimated parameter results
+    MICE_default_pooled_param_list <- list()
+    MICE_CM_pooled_param_list <- list()
+    MICE_INM_pooled_param_list <- list()
+    MICE_INNM_pooled_param_list <- list()
+    it_status_inf_list <- list()
+    
+    # Path where the imputed data for scenario 2 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\mice\\s2\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file)
+    
+        MICE_default_pooled_param_list[[iterno]] <- it_list[[1]]
+        MICE_CM_pooled_param_list[[iterno]] <- it_list[[2]]
+        MICE_INM_pooled_param_list[[iterno]] <- it_list[[3]]
+        MICE_INNM_pooled_param_list[[iterno]] <- it_list[[4]]
+        it_status_inf_list[[iterno]] <- it_list[[5]]
+        iterno <- iterno + 1
+    
+    }
+
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MICE_default_pooled_param_list,
+                MICE_CM_pooled_param_list,
+                MICE_INM_pooled_param_list,
+                MICE_INNM_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s2_MICE, file = "simulation_rr60_n50_s2_MICE.RData")
+save(simulation_rr70_n50_s2_MICE, file = "simulation_rr70_n50_s2_MICE.RData")
+save(simulation_rr80_n50_s2_MICE, file = "simulation_rr80_n50_s2_MICE.RData")
+save(simulation_rr60_n100_s2_MICE, file = "simulation_rr60_n100_s2_MICE.RData")
+save(simulation_rr70_n100_s2_MICE, file = "simulation_rr70_n100_s2_MICE.RData")
+save(simulation_rr80_n100_s2_MICE, file = "simulation_rr80_n100_s2_MICE.RData")
+save(simulation_rr60_n200_s2_MICE, file = "simulation_rr60_n200_s2_MICE.RData")
+save(simulation_rr70_n200_s2_MICE, file = "simulation_rr70_n200_s2_MICE.RData")
+save(simulation_rr80_n200_s2_MICE, file = "simulation_rr80_n200_s2_MICE.RData")
+save(simulation_rr60_n500_s2_MICE, file = "simulation_rr60_n500_s2_MICE.RData")
+save(simulation_rr70_n500_s2_MICE, file = "simulation_rr70_n500_s2_MICE.RData")
+save(simulation_rr80_n500_s2_MICE, file = "simulation_rr80_n500_s2_MICE.RData")
+save(simulation_rr60_n1000_s2_MICE, file = "simulation_rr60_n1000_s2_MICE.RData")
+save(simulation_rr70_n1000_s2_MICE, file = "simulation_rr70_n1000_s2_MICE.RData")
+save(simulation_rr80_n1000_s2_MICE, file = "simulation_rr80_n1000_s2_MICE.RData")
+
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s2_MICE_it_inf, file = "simulation_rr60_n50_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n50_s2_MICE_it_inf, file = "simulation_rr70_n50_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n50_s2_MICE_it_inf, file = "simulation_rr80_n50_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n100_s2_MICE_it_inf, file = "simulation_rr60_n100_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n100_s2_MICE_it_inf, file = "simulation_rr70_n100_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n100_s2_MICE_it_inf, file = "simulation_rr80_n100_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n200_s2_MICE_it_inf, file = "simulation_rr60_n200_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n200_s2_MICE_it_inf, file = "simulation_rr70_n200_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n200_s2_MICE_it_inf, file = "simulation_rr80_n200_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n500_s2_MICE_it_inf, file = "simulation_rr60_n500_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n500_s2_MICE_it_inf, file = "simulation_rr70_n500_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n500_s2_MICE_it_inf, file = "simulation_rr80_n500_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s2_MICE_it_inf, file = "simulation_rr60_n1000_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s2_MICE_it_inf, file = "simulation_rr70_n1000_s2_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s2_MICE_it_inf, file = "simulation_rr80_n1000_s2_MICE_it_inf.rds")
+
+```
+
+
+### 2.2.3 Working Model Scenario 3
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# Running MICE variants for working model scenario 3 for all the sample sizes
+# and response rates
+for (rr in response_rates){
+  for (ss in sample_sizes) {
+      sim_study_mice(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s3,
+        response_models = response_models_s3,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s3_MICE",
+  "simulation_rr70_n50_s3_MICE",
+  "simulation_rr80_n50_s3_MICE",
+  "simulation_rr60_n100_s3_MICE",
+  "simulation_rr70_n100_s3_MICE",
+  "simulation_rr80_n100_s3_MICE",
+  "simulation_rr60_n200_s3_MICE",
+  "simulation_rr70_n200_s3_MICE",
+  "simulation_rr80_n200_s3_MICE",
+  "simulation_rr60_n500_s3_MICE",
+  "simulation_rr70_n500_s3_MICE",
+  "simulation_rr80_n500_s3_MICE",
+  "simulation_rr60_n1000_s3_MICE",
+  "simulation_rr70_n1000_s3_MICE",
+  "simulation_rr80_n1000_s3_MICE")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s3_MICE_it_inf",
+  "simulation_rr70_n50_s3_MICE_it_inf",
+  "simulation_rr80_n50_s3_MICE_it_inf",
+  "simulation_rr60_n100_s3_MICE_it_inf",
+  "simulation_rr70_n100_s3_MICE_it_inf",
+  "simulation_rr80_n100_s3_MICE_it_inf",
+  "simulation_rr60_n200_s3_MICE_it_inf",
+  "simulation_rr70_n200_s3_MICE_it_inf",
+  "simulation_rr80_n200_s3_MICE_it_inf",
+  "simulation_rr60_n500_s3_MICE_it_inf",
+  "simulation_rr70_n500_s3_MICE_it_inf",
+  "simulation_rr80_n500_s3_MICE_it_inf",
+  "simulation_rr60_n1000_s3_MICE_it_inf",
+  "simulation_rr70_n1000_s3_MICE_it_inf",
+  "simulation_rr80_n1000_s3_MICE_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+
+   # List for each MICE variant for the estimated parameter results
+    MICE_default_pooled_param_list <- list()
+    MICE_CM_pooled_param_list <- list()
+    MICE_INM_pooled_param_list <- list()
+    MICE_INNM_pooled_param_list <- list()
+    it_status_inf_list <- list()
+    
+    # Path where the imputed data for scenario 3 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\mice\\s3\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file)
+    
+        MICE_default_pooled_param_list[[iterno]] <- it_list[[1]]
+        MICE_CM_pooled_param_list[[iterno]] <- it_list[[2]]
+        MICE_INM_pooled_param_list[[iterno]] <- it_list[[3]]
+        MICE_INNM_pooled_param_list[[iterno]] <- it_list[[4]]
+        it_status_inf_list[[iterno]] <- it_list[[5]]
+        iterno <- iterno + 1
+    
+    }
+
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MICE_default_pooled_param_list,
+                MICE_CM_pooled_param_list,
+                MICE_INM_pooled_param_list,
+                MICE_INNM_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s3_MICE, file = "simulation_rr60_n50_s3_MICE.RData")
+save(simulation_rr70_n50_s3_MICE, file = "simulation_rr70_n50_s3_MICE.RData")
+save(simulation_rr80_n50_s3_MICE, file = "simulation_rr80_n50_s3_MICE.RData")
+save(simulation_rr60_n100_s3_MICE, file = "simulation_rr60_n100_s3_MICE.RData")
+save(simulation_rr70_n100_s3_MICE, file = "simulation_rr70_n100_s3_MICE.RData")
+save(simulation_rr80_n100_s3_MICE, file = "simulation_rr80_n100_s3_MICE.RData")
+save(simulation_rr60_n200_s3_MICE, file = "simulation_rr60_n200_s3_MICE.RData")
+save(simulation_rr70_n200_s3_MICE, file = "simulation_rr70_n200_s3_MICE.RData")
+save(simulation_rr80_n200_s3_MICE, file = "simulation_rr80_n200_s3_MICE.RData")
+save(simulation_rr60_n500_s3_MICE, file = "simulation_rr60_n500_s3_MICE.RData")
+save(simulation_rr70_n500_s3_MICE, file = "simulation_rr70_n500_s3_MICE.RData")
+save(simulation_rr80_n500_s3_MICE, file = "simulation_rr80_n500_s3_MICE.RData")
+save(simulation_rr60_n1000_s3_MICE, file = "simulation_rr60_n1000_s3_MICE.RData")
+save(simulation_rr70_n1000_s3_MICE, file = "simulation_rr70_n1000_s3_MICE.RData")
+save(simulation_rr80_n1000_s3_MICE, file = "simulation_rr80_n1000_s3_MICE.RData")
+
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s3_MICE_it_inf, file = "simulation_rr60_n50_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n50_s3_MICE_it_inf, file = "simulation_rr70_n50_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n50_s3_MICE_it_inf, file = "simulation_rr80_n50_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n100_s3_MICE_it_inf, file = "simulation_rr60_n100_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n100_s3_MICE_it_inf, file = "simulation_rr70_n100_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n100_s3_MICE_it_inf, file = "simulation_rr80_n100_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n200_s3_MICE_it_inf, file = "simulation_rr60_n200_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n200_s3_MICE_it_inf, file = "simulation_rr70_n200_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n200_s3_MICE_it_inf, file = "simulation_rr80_n200_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n500_s3_MICE_it_inf, file = "simulation_rr60_n500_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n500_s3_MICE_it_inf, file = "simulation_rr70_n500_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n500_s3_MICE_it_inf, file = "simulation_rr80_n500_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s3_MICE_it_inf, file = "simulation_rr60_n1000_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s3_MICE_it_inf, file = "simulation_rr70_n1000_s3_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s3_MICE_it_inf, file = "simulation_rr80_n1000_s3_MICE_it_inf.rds")
+
+
+```
+
+
+
+### 2.2.4 Working Model Scenario 4
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# Running MICE variants for working model scenario 4 for all the sample sizes
+# and response rates
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_mice(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s4,
+        response_models = response_models_s4,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s4_MICE",
+  "simulation_rr70_n50_s4_MICE",
+  "simulation_rr80_n50_s4_MICE",
+  "simulation_rr60_n100_s4_MICE",
+  "simulation_rr70_n100_s4_MICE",
+  "simulation_rr80_n100_s4_MICE",
+  "simulation_rr60_n200_s4_MICE",
+  "simulation_rr70_n200_s4_MICE",
+  "simulation_rr80_n200_s4_MICE",
+  "simulation_rr60_n500_s4_MICE",
+  "simulation_rr70_n500_s4_MICE",
+  "simulation_rr80_n500_s4_MICE",
+  "simulation_rr60_n1000_s4_MICE",
+  "simulation_rr70_n1000_s4_MICE",
+  "simulation_rr80_n1000_s4_MICE")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s4_MICE_it_inf",
+  "simulation_rr70_n50_s4_MICE_it_inf",
+  "simulation_rr80_n50_s4_MICE_it_inf",
+  "simulation_rr60_n100_s4_MICE_it_inf",
+  "simulation_rr70_n100_s4_MICE_it_inf",
+  "simulation_rr80_n100_s4_MICE_it_inf",
+  "simulation_rr60_n200_s4_MICE_it_inf",
+  "simulation_rr70_n200_s4_MICE_it_inf",
+  "simulation_rr80_n200_s4_MICE_it_inf",
+  "simulation_rr60_n500_s4_MICE_it_inf",
+  "simulation_rr70_n500_s4_MICE_it_inf",
+  "simulation_rr80_n500_s4_MICE_it_inf",
+  "simulation_rr60_n1000_s4_MICE_it_inf",
+  "simulation_rr70_n1000_s4_MICE_it_inf",
+  "simulation_rr80_n1000_s4_MICE_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    
+   # List for each MICE variant for the estimated parameter results
+    MICE_default_pooled_param_list <- list()
+    MICE_CM_pooled_param_list <- list()
+    MICE_INM_pooled_param_list <- list()
+    MICE_INNM_pooled_param_list <- list()
+    it_status_inf_list <- list()
+    
+    # Path where the imputed data for scenario 4 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\mice\\s4\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file)
+    
+        MICE_default_pooled_param_list[[iterno]] <- it_list[[1]]
+        MICE_CM_pooled_param_list[[iterno]] <- it_list[[2]]
+        MICE_INM_pooled_param_list[[iterno]] <- it_list[[3]]
+        MICE_INNM_pooled_param_list[[iterno]] <- it_list[[4]]
+        it_status_inf_list[[iterno]] <- it_list[[5]]
+        iterno <- iterno + 1
+    
+    }
+
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MICE_default_pooled_param_list,
+                MICE_CM_pooled_param_list,
+                MICE_INM_pooled_param_list,
+                MICE_INNM_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s4_MICE, file = "simulation_rr60_n50_s4_MICE.RData")
+save(simulation_rr70_n50_s4_MICE, file = "simulation_rr70_n50_s4_MICE.RData")
+save(simulation_rr80_n50_s4_MICE, file = "simulation_rr80_n50_s4_MICE.RData")
+save(simulation_rr60_n100_s4_MICE, file = "simulation_rr60_n100_s4_MICE.RData")
+save(simulation_rr70_n100_s4_MICE, file = "simulation_rr70_n100_s4_MICE.RData")
+save(simulation_rr80_n100_s4_MICE, file = "simulation_rr80_n100_s4_MICE.RData")
+save(simulation_rr60_n200_s4_MICE, file = "simulation_rr60_n200_s4_MICE.RData")
+save(simulation_rr70_n200_s4_MICE, file = "simulation_rr70_n200_s4_MICE.RData")
+save(simulation_rr80_n200_s4_MICE, file = "simulation_rr80_n200_s4_MICE.RData")
+save(simulation_rr60_n500_s4_MICE, file = "simulation_rr60_n500_s4_MICE.RData")
+save(simulation_rr70_n500_s4_MICE, file = "simulation_rr70_n500_s4_MICE.RData")
+save(simulation_rr80_n500_s4_MICE, file = "simulation_rr80_n500_s4_MICE.RData")
+save(simulation_rr60_n1000_s4_MICE, file = "simulation_rr60_n1000_s4_MICE.RData")
+save(simulation_rr70_n1000_s4_MICE, file = "simulation_rr70_n1000_s4_MICE.RData")
+save(simulation_rr80_n1000_s4_MICE, file = "simulation_rr80_n1000_s4_MICE.RData")
+
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s4_MICE_it_inf, file = "simulation_rr60_n50_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n50_s4_MICE_it_inf, file = "simulation_rr70_n50_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n50_s4_MICE_it_inf, file = "simulation_rr80_n50_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n100_s4_MICE_it_inf, file = "simulation_rr60_n100_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n100_s4_MICE_it_inf, file = "simulation_rr70_n100_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n100_s4_MICE_it_inf, file = "simulation_rr80_n100_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n200_s4_MICE_it_inf, file = "simulation_rr60_n200_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n200_s4_MICE_it_inf, file = "simulation_rr70_n200_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n200_s4_MICE_it_inf, file = "simulation_rr80_n200_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n500_s4_MICE_it_inf, file = "simulation_rr60_n500_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n500_s4_MICE_it_inf, file = "simulation_rr70_n500_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n500_s4_MICE_it_inf, file = "simulation_rr80_n500_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s4_MICE_it_inf, file = "simulation_rr60_n1000_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s4_MICE_it_inf, file = "simulation_rr70_n1000_s4_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s4_MICE_it_inf, file = "simulation_rr80_n1000_s4_MICE_it_inf.rds")
+
+
+```
+
+
+
+### 2.2.5 Working Model Scenario 5
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# Running MICE variants for working model scenario 5 for all the sample sizes
+# and response rates
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_study_mice(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s5,
+        response_models = response_models_s5,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+
+```
+
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s5_MICE",
+  "simulation_rr70_n50_s5_MICE",
+  "simulation_rr80_n50_s5_MICE",
+  "simulation_rr60_n100_s5_MICE",
+  "simulation_rr70_n100_s5_MICE",
+  "simulation_rr80_n100_s5_MICE",
+  "simulation_rr60_n200_s5_MICE",
+  "simulation_rr70_n200_s5_MICE",
+  "simulation_rr80_n200_s5_MICE",
+  "simulation_rr60_n500_s5_MICE",
+  "simulation_rr70_n500_s5_MICE",
+  "simulation_rr80_n500_s5_MICE",
+  "simulation_rr60_n1000_s5_MICE",
+  "simulation_rr70_n1000_s5_MICE",
+  "simulation_rr80_n1000_s5_MICE")
+
+it_info_filenames_list <- list(
+  "simulation_rr60_n50_s5_MICE_it_inf",
+  "simulation_rr70_n50_s5_MICE_it_inf",
+  "simulation_rr80_n50_s5_MICE_it_inf",
+  "simulation_rr60_n100_s5_MICE_it_inf",
+  "simulation_rr70_n100_s5_MICE_it_inf",
+  "simulation_rr80_n100_s5_MICE_it_inf",
+  "simulation_rr60_n200_s5_MICE_it_inf",
+  "simulation_rr70_n200_s5_MICE_it_inf",
+  "simulation_rr80_n200_s5_MICE_it_inf",
+  "simulation_rr60_n500_s5_MICE_it_inf",
+  "simulation_rr70_n500_s5_MICE_it_inf",
+  "simulation_rr80_n500_s5_MICE_it_inf",
+  "simulation_rr60_n1000_s5_MICE_it_inf",
+  "simulation_rr70_n1000_s5_MICE_it_inf",
+  "simulation_rr80_n1000_s5_MICE_it_inf")
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+    
+   # List for each MICE variant for the pooled parameter results
+    MICE_default_pooled_param_list <- list()
+    MICE_CM_pooled_param_list <- list()
+    MICE_INM_pooled_param_list <- list()
+    MICE_INNM_pooled_param_list <- list()
+    it_status_inf_list <- list()
+    
+    # Path where the imputed data for scenario 5 is located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\mice\\s5\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    iterno = 1
+    
+    # Looping the 5000 files that include the results during each iteration
+    for(sim_file in sim_files){
+    
+      it_list <- readRDS(sim_file)
+    
+        MICE_default_pooled_param_list[[iterno]] <- it_list[[1]]
+        MICE_CM_pooled_param_list[[iterno]] <- it_list[[2]]
+        MICE_INM_pooled_param_list[[iterno]] <- it_list[[3]]
+        MICE_INNM_pooled_param_list[[iterno]] <- it_list[[4]]
+        it_status_inf_list[[iterno]] <- it_list[[5]]
+        iterno <- iterno + 1
+    
+    }
+
+    
+    # Combining the results of 5000 samples into one one list
+    assign(result_filenames_list[[iter_list]],
+           list(MICE_default_pooled_param_list,
+                MICE_CM_pooled_param_list,
+                MICE_INM_pooled_param_list,
+                MICE_INNM_pooled_param_list))
+    
+    # Combining the information related to errors that could have occurred 
+    # during the 5000 iterations
+     it_inf <- do.call(cbind, it_status_inf_list)
+ 
+    # Calculates the mean of each error
+    assign(it_info_filenames_list[[iter_list]], apply(it_inf, 1, mean)) 
+    
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+
+# Saving the results of each method
+save(simulation_rr60_n50_s5_MICE, file = "simulation_rr60_n50_s5_MICE.RData")
+save(simulation_rr70_n50_s5_MICE, file = "simulation_rr70_n50_s5_MICE.RData")
+save(simulation_rr80_n50_s5_MICE, file = "simulation_rr80_n50_s5_MICE.RData")
+save(simulation_rr60_n100_s5_MICE, file = "simulation_rr60_n100_s5_MICE.RData")
+save(simulation_rr70_n100_s5_MICE, file = "simulation_rr70_n100_s5_MICE.RData")
+save(simulation_rr80_n100_s5_MICE, file = "simulation_rr80_n100_s5_MICE.RData")
+save(simulation_rr60_n200_s5_MICE, file = "simulation_rr60_n200_s5_MICE.RData")
+save(simulation_rr70_n200_s5_MICE, file = "simulation_rr70_n200_s5_MICE.RData")
+save(simulation_rr80_n200_s5_MICE, file = "simulation_rr80_n200_s5_MICE.RData")
+save(simulation_rr60_n500_s5_MICE, file = "simulation_rr60_n500_s5_MICE.RData")
+save(simulation_rr70_n500_s5_MICE, file = "simulation_rr70_n500_s5_MICE.RData")
+save(simulation_rr80_n500_s5_MICE, file = "simulation_rr80_n500_s5_MICE.RData")
+save(simulation_rr60_n1000_s5_MICE, file = "simulation_rr60_n1000_s5_MICE.RData")
+save(simulation_rr70_n1000_s5_MICE, file = "simulation_rr70_n1000_s5_MICE.RData")
+save(simulation_rr80_n1000_s5_MICE, file = "simulation_rr80_n1000_s5_MICE.RData")
+
+# Saving the error information
+saveRDS(simulation_rr60_n50_s5_MICE_it_inf, file = "simulation_rr60_n50_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n50_s5_MICE_it_inf, file = "simulation_rr70_n50_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n50_s5_MICE_it_inf, file = "simulation_rr80_n50_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n100_s5_MICE_it_inf, file = "simulation_rr60_n100_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n100_s5_MICE_it_inf, file = "simulation_rr70_n100_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n100_s5_MICE_it_inf, file = "simulation_rr80_n100_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n200_s5_MICE_it_inf, file = "simulation_rr60_n200_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n200_s5_MICE_it_inf, file = "simulation_rr70_n200_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n200_s5_MICE_it_inf, file = "simulation_rr80_n200_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n500_s5_MICE_it_inf, file = "simulation_rr60_n500_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n500_s5_MICE_it_inf, file = "simulation_rr70_n500_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n500_s5_MICE_it_inf, file = "simulation_rr80_n500_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr60_n1000_s5_MICE_it_inf, file = "simulation_rr60_n1000_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr70_n1000_s5_MICE_it_inf, file = "simulation_rr70_n1000_s5_MICE_it_inf.rds")
+saveRDS(simulation_rr80_n1000_s5_MICE_it_inf, file = "simulation_rr80_n1000_s5_MICE_it_inf.rds")
+
+```
+
+
+
+
+
+## 2.3 Complete-Case Analysis (CCA)
+
+```{r}
+library(parallel)
+# Simulation function to run CCA in parallel.
+# Parameters:
+# 1. iterations: M = number of wanted imputed datasets
+# 2. population: The generated population with all the units
+# 3. n: sample size
+# 4. outcome_models: list of the outcome models formula
+# 5. response_models: list of the response model formulas
+# 6. RR: response rate which can be either "60", "70" or "80"
+
+# NOTE: the outcome and response models that are given to check the HL error so 
+# that CCA uses the same data in each working model scenario as the robust 
+# methods.
+
+sim_sample_prop <- function(iterations,
+                             population,
+                             n,
+                             outcome_models,
+                             response_models,
+                             RR){
+  source("simulation_fun.R")
+
+    cores = detectCores()
+
+    cl <- makeCluster(detectCores() - 1, type="PSOCK")
+
+    param_vector <- list(
+      0, # placeholder for iter no
+      population,
+      n,
+      outcome_models,
+      response_models,
+      RR)
+
+    macro_config <- list()
+
+  for(s in 1:iterations){
+    param_vector[[1]] <- s
+    macro_config[[s]] <- param_vector
+
+  }
+
+    all_MI_methods_parallel <- parLapply(cl, macro_config, fun_sample_proportions)
+
+     stopCluster(cl)
+
+ }
+
+
+```
+
+
+
+### 2.3.1 Working Model Scenario 1
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# CCA for scenario 1 with all the sample sizes and response rates
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_sample_prop(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s1,
+        response_models = response_models_s1,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+```
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s1_CCA",
+  "simulation_rr70_n50_s1_CCA",
+  "simulation_rr80_n50_s1_CCA",
+  "simulation_rr60_n100_s1_CCA",
+  "simulation_rr70_n100_s1_CCA",
+  "simulation_rr80_n100_s1_CCA",
+  "simulation_rr60_n200_s1_CCA",
+  "simulation_rr70_n200_s1_CCA",
+  "simulation_rr80_n200_s1_CCA",
+  "simulation_rr60_n500_s1_CCA",
+  "simulation_rr70_n500_s1_CCA",
+  "simulation_rr80_n500_s1_CCA",
+  "simulation_rr60_n1000_s1_CCA",
+  "simulation_rr70_n1000_s1_CCA",
+  "simulation_rr80_n1000_s1_CCA"
+)
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+
+    iterno = 1
+    
+    # List for the CCA results
+    sample_proportions_list <- list()
+    
+    # Path where the CCA results for the 50000 iterations in scenario 1 are located
+    sim_files <- list.files(path = paste0("C:\\...\\sample proportions\\s1\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    # Looping through the 5000 files
+    for(file in sim_files){
+      sim_file <- readRDS(file)
+        sample_proportions_list[[iterno]] <- sim_file
+        iterno <- iterno + 1
+    }
+    
+  # Combining the results from the list
+    sample_proportions <- do.call(rbind, sample_proportions_list)
+      
+    # Calculating the mean proportions
+    sample_proportions_mean <- apply(sample_proportions, 2, mean)
+    
+    # Calculating the SD of each the proportions
+    sample_proportions_sd <- apply(sample_proportions, 2, sd)
+    
+    # Combining the results into a dataframe
+    sample_proportions <- as.data.frame(
+      cbind(sample_proportions_mean,
+            sample_proportions_sd))
+    
+    colnames(sample_proportions) <- c("ASP", "SD")
+    sample_proportions <- round(sample_proportions, 3)
+    
+    assign(result_filenames_list[[iter_list]], sample_proportions)
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+# Saving the results
+save(simulation_rr60_n50_s1_CCA, file = "simulation_rr60_n50_s1_CCA.RData")
+save(simulation_rr70_n50_s1_CCA, file = "simulation_rr70_n50_s1_CCA.RData")
+save(simulation_rr80_n50_s1_CCA, file = "simulation_rr80_n50_s1_CCA.RData")
+save(simulation_rr60_n100_s1_CCA, file = "simulation_rr60_n100_s1_CCA.RData")
+save(simulation_rr70_n100_s1_CCA, file = "simulation_rr70_n100_s1_CCA.RData")
+save(simulation_rr80_n100_s1_CCA, file = "simulation_rr80_n100_s1_CCA.RData")
+save(simulation_rr60_n200_s1_CCA, file = "simulation_rr60_n200_s1_CCA.RData")
+save(simulation_rr70_n200_s1_CCA, file = "simulation_rr70_n200_s1_CCA.RData")
+save(simulation_rr80_n200_s1_CCA, file = "simulation_rr80_n200_s1_CCA.RData")
+save(simulation_rr60_n500_s1_CCA, file = "simulation_rr60_n500_s1_CCA.RData")
+save(simulation_rr70_n500_s1_CCA, file = "simulation_rr70_n500_s1_CCA.RData")
+save(simulation_rr80_n500_s1_CCA, file = "simulation_rr80_n500_s1_CCA.RData")
+save(simulation_rr60_n1000_s1_CCA, file = "simulation_rr60_n1000_s1_CCA.RData")
+save(simulation_rr70_n1000_s1_CCA, file = "simulation_rr70_n1000_s1_CCA.RData")
+save(simulation_rr80_n1000_s1_CCA, file = "simulation_rr80_n1000_s1_CCA.RData")
+
+
+```
+
+
+
+### 2.3.2 Working Model Scenario 2
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# CCA for scenario 2 with all the sample sizes and response rates
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_sample_prop(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s2,
+        response_models = response_models_s2,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+```
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s2_CCA",
+  "simulation_rr70_n50_s2_CCA",
+  "simulation_rr80_n50_s2_CCA",
+  "simulation_rr60_n100_s2_CCA",
+  "simulation_rr70_n100_s2_CCA",
+  "simulation_rr80_n100_s2_CCA",
+  "simulation_rr60_n200_s2_CCA",
+  "simulation_rr70_n200_s2_CCA",
+  "simulation_rr80_n200_s2_CCA",
+  "simulation_rr60_n500_s2_CCA",
+  "simulation_rr70_n500_s2_CCA",
+  "simulation_rr80_n500_s2_CCA",
+  "simulation_rr60_n1000_s2_CCA",
+  "simulation_rr70_n1000_s2_CCA",
+  "simulation_rr80_n1000_s2_CCA"
+)
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+
+    iterno = 1
+    
+    # List for the CCA results
+    sample_proportions_list <- list()
+    
+    # Path where the CCA results for the 50000 iterations in scenario 2 are located
+    sim_files <- list.files(path = paste0("C:\\...\\sample proportions\\s2\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    # Looping through the 5000 files
+    for(file in sim_files){
+      sim_file <- readRDS(file)
+        sample_proportions_list[[iterno]] <- sim_file
+        iterno <- iterno + 1
+    }
+    
+  # Combining the results from the list
+    sample_proportions <- do.call(rbind, sample_proportions_list)
+      
+    # Calculating the mean proportions
+    sample_proportions_mean <- apply(sample_proportions, 2, mean)
+    
+    # Calculating the SD of each the proportions
+    sample_proportions_sd <- apply(sample_proportions, 2, sd)
+    
+    # Combining the results into a dataframe
+    sample_proportions <- as.data.frame(
+      cbind(sample_proportions_mean,
+            sample_proportions_sd))
+    
+    colnames(sample_proportions) <- c("ASP", "SD")
+    sample_proportions <- round(sample_proportions, 3)
+    
+    assign(result_filenames_list[[iter_list]], sample_proportions)
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+# Saving the results
+save(simulation_rr60_n50_s2_CCA, file = "simulation_rr60_n50_s2_CCA.RData")
+save(simulation_rr70_n50_s2_CCA, file = "simulation_rr70_n50_s2_CCA.RData")
+save(simulation_rr80_n50_s2_CCA, file = "simulation_rr80_n50_s2_CCA.RData")
+save(simulation_rr60_n100_s2_CCA, file = "simulation_rr60_n100_s2_CCA.RData")
+save(simulation_rr70_n100_s2_CCA, file = "simulation_rr70_n100_s2_CCA.RData")
+save(simulation_rr80_n100_s2_CCA, file = "simulation_rr80_n100_s2_CCA.RData")
+save(simulation_rr60_n200_s2_CCA, file = "simulation_rr60_n200_s2_CCA.RData")
+save(simulation_rr70_n200_s2_CCA, file = "simulation_rr70_n200_s2_CCA.RData")
+save(simulation_rr80_n200_s2_CCA, file = "simulation_rr80_n200_s2_CCA.RData")
+save(simulation_rr60_n500_s2_CCA, file = "simulation_rr60_n500_s2_CCA.RData")
+save(simulation_rr70_n500_s2_CCA, file = "simulation_rr70_n500_s2_CCA.RData")
+save(simulation_rr80_n500_s2_CCA, file = "simulation_rr80_n500_s2_CCA.RData")
+save(simulation_rr60_n1000_s2_CCA, file = "simulation_rr60_n1000_s2_CCA.RData")
+save(simulation_rr70_n1000_s2_CCA, file = "simulation_rr70_n1000_s2_CCA.RData")
+save(simulation_rr80_n1000_s2_CCA, file = "simulation_rr80_n1000_s2_CCA.RData")
+
+
+
+```
+
+
+
+### 2.3.3 Working Model Scenario 3
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# CA for scenario 3 with all the sample sizes and response rates
+for (rr in response_rates)  {
+  for (ss in sample_sizes) {
+      sim_sample_prop(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s3,
+        response_models = response_models_s3,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+```
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s3_CCA",
+  "simulation_rr70_n50_s3_CCA",
+  "simulation_rr80_n50_s3_CCA",
+  "simulation_rr60_n100_s3_CCA",
+  "simulation_rr70_n100_s3_CCA",
+  "simulation_rr80_n100_s3_CCA",
+  "simulation_rr60_n200_s3_CCA",
+  "simulation_rr70_n200_s3_CCA",
+  "simulation_rr80_n200_s3_CCA",
+  "simulation_rr60_n500_s3_CCA",
+  "simulation_rr70_n500_s3_CCA",
+  "simulation_rr80_n500_s3_CCA",
+  "simulation_rr60_n1000_s3_CCA",
+  "simulation_rr70_n1000_s3_CCA",
+  "simulation_rr80_n1000_s3_CCA"
+)
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+
+    iterno = 1
+    
+    # List for the CCA results
+    sample_proportions_list <- list()
+    
+    # Path where the CCA results for the 50000 iterations in scenario 3 are located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\sample proportions\\s3\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    # Looping through the 5000 files
+    for(file in sim_files){
+      sim_file <- readRDS(file)
+        sample_proportions_list[[iterno]] <- sim_file
+        iterno <- iterno + 1
+    }
+    
+  # Combining the results from the list
+    sample_proportions <- do.call(rbind, sample_proportions_list)
+      
+    # Calculating the mean proportions
+    sample_proportions_mean <- apply(sample_proportions, 2, mean)
+    
+    # Calculating the SD of each the proportions
+    sample_proportions_sd <- apply(sample_proportions, 2, sd)
+    
+    # Combining the results into a dataframe
+    sample_proportions <- as.data.frame(
+      cbind(sample_proportions_mean,
+            sample_proportions_sd))
+    
+    colnames(sample_proportions) <- c("ASP", "SD")
+    sample_proportions <- round(sample_proportions, 3)
+    
+    assign(result_filenames_list[[iter_list]], sample_proportions)
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+# Saving the results
+save(simulation_rr60_n50_s3_CCA, file = "simulation_rr60_n50_s3_CCA.RData")
+save(simulation_rr70_n50_s3_CCA, file = "simulation_rr70_n50_s3_CCA.RData")
+save(simulation_rr80_n50_s3_CCA, file = "simulation_rr80_n50_s3_CCA.RData")
+save(simulation_rr60_n100_s3_CCA, file = "simulation_rr60_n100_s3_CCA.RData")
+save(simulation_rr70_n100_s3_CCA, file = "simulation_rr70_n100_s3_CCA.RData")
+save(simulation_rr80_n100_s3_CCA, file = "simulation_rr80_n100_s3_CCA.RData")
+save(simulation_rr60_n200_s3_CCA, file = "simulation_rr60_n200_s3_CCA.RData")
+save(simulation_rr70_n200_s3_CCA, file = "simulation_rr70_n200_s3_CCA.RData")
+save(simulation_rr80_n200_s3_CCA, file = "simulation_rr80_n200_s3_CCA.RData")
+save(simulation_rr60_n500_s3_CCA, file = "simulation_rr60_n500_s3_CCA.RData")
+save(simulation_rr70_n500_s3_CCA, file = "simulation_rr70_n500_s3_CCA.RData")
+save(simulation_rr80_n500_s3_CCA, file = "simulation_rr80_n500_s3_CCA.RData")
+save(simulation_rr60_n1000_s3_CCA, file = "simulation_rr60_n1000_s3_CCA.RData")
+save(simulation_rr70_n1000_s3_CCA, file = "simulation_rr70_n1000_s3_CCA.RData")
+save(simulation_rr80_n1000_s3_CCA, file = "simulation_rr80_n1000_s3_CCA.RData")
+
+```
+
+
+### 2.3.4 Working Model Scenario 4
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# CCA for scenario 4 with all the sample sizes and response rates
+for (rr in response_rates){
+  for (ss in sample_sizes) {
+      sim_sample_prop(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s4,
+        response_models = response_models_s4,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+```
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s4_CCA",
+  "simulation_rr70_n50_s4_CCA",
+  "simulation_rr80_n50_s4_CCA",
+  "simulation_rr60_n100_s4_CCA",
+  "simulation_rr70_n100_s4_CCA",
+  "simulation_rr80_n100_s4_CCA",
+  "simulation_rr60_n200_s4_CCA",
+  "simulation_rr70_n200_s4_CCA",
+  "simulation_rr80_n200_s4_CCA",
+  "simulation_rr60_n500_s4_CCA",
+  "simulation_rr70_n500_s4_CCA",
+  "simulation_rr80_n500_s4_CCA",
+  "simulation_rr60_n1000_s4_CCA",
+  "simulation_rr70_n1000_s4_CCA",
+  "simulation_rr80_n1000_s4_CCA",
+)
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+
+    iterno = 1
+    
+    # List for the CCA results
+    sample_proportions_list <- list()
+    
+    # Path where the CCA results for the 50000 iterations in scenario 4 are located
+    sim_files <- list.files(path = paste0("C:\\Users\\...\\Imputed data\\sample proportions\\s4\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    # Looping through the 5000 files
+    for(file in sim_files){
+      sim_file <- readRDS(file)
+        sample_proportions_list[[iterno]] <- sim_file
+        iterno <- iterno + 1
+    }
+    
+  # Combining the results from the list
+    sample_proportions <- do.call(rbind, sample_proportions_list)
+      
+    # Calculating the mean proportions
+    sample_proportions_mean <- apply(sample_proportions, 2, mean)
+    
+    # Calculating the SD of each the proportions
+    sample_proportions_sd <- apply(sample_proportions, 2, sd)
+    
+    # Combining the results into a dataframe
+    sample_proportions <- as.data.frame(
+      cbind(sample_proportions_mean,
+            sample_proportions_sd))
+    
+    colnames(sample_proportions) <- c("ASP", "SD")
+    sample_proportions <- round(sample_proportions, 3)
+    
+    assign(result_filenames_list[[iter_list]], sample_proportions)
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+# Saving the results
+save(simulation_rr60_n50_s4_CCA, file = "simulation_rr60_n50_s4_CCA.RData")
+save(simulation_rr70_n50_s4_CCA, file = "simulation_rr70_n50_s4_CCA.RData")
+save(simulation_rr80_n50_s4_CCA, file = "simulation_rr80_n50_s4_CCA.RData")
+save(simulation_rr60_n100_s4_CCA, file = "simulation_rr60_n100_s4_CCA.RData")
+save(simulation_rr70_n100_s4_CCA, file = "simulation_rr70_n100_s4_CCA.RData")
+save(simulation_rr80_n100_s4_CCA, file = "simulation_rr80_n100_s4_CCA.RData")
+save(simulation_rr60_n200_s4_CCA, file = "simulation_rr60_n200_s4_CCA.RData")
+save(simulation_rr70_n200_s4_CCA, file = "simulation_rr70_n200_s4_CCA.RData")
+save(simulation_rr80_n200_s4_CCA, file = "simulation_rr80_n200_s4_CCA.RData")
+save(simulation_rr60_n500_s4_CCA, file = "simulation_rr60_n500_s4_CCA.RData")
+save(simulation_rr70_n500_s4_CCA, file = "simulation_rr70_n500_s4_CCA.RData")
+save(simulation_rr80_n500_s4_CCA, file = "simulation_rr80_n500_s4_CCA.RData")
+save(simulation_rr60_n1000_s4_CCA, file = "simulation_rr60_n1000_s4_CCA.RData")
+save(simulation_rr70_n1000_s4_CCA, file = "simulation_rr70_n1000_s4_CCA.RData")
+save(simulation_rr80_n1000_s4_CCA, file = "simulation_rr80_n1000_s4_CCA.RData")
+
+
+
+```
+
+
+### 2.3.5 Working Model Scenario 5
+
+```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+
+# CCA for scenario 5 with all the sample sizes and response rates
+for (rr in response_rates){
+  for (ss in sample_sizes) {
+      sim_sample_prop(
+        iterations = 5000,
+        population = population,
+        n = ss,
+        outcome_models = outcome_models_s5,
+        response_models = response_models_s5,
+        RR = rr
+        )
+      # print("rr")
+      # print(rr)
+      # print("ss")
+      # print(ss)
+  }
+}
+
+```
+
+```{r}
+
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+iter_list <- 1
+
+result_filenames_list <- list(
+  "simulation_rr60_n50_s5_CCA",
+  "simulation_rr70_n50_s5_CCA",
+  "simulation_rr80_n50_s5_CCA",
+  "simulation_rr60_n100_s5_CCA",
+  "simulation_rr70_n100_s5_CCA",
+  "simulation_rr80_n100_s5_CCA",
+  "simulation_rr60_n200_s5_CCA",
+  "simulation_rr70_n200_s5_CCA",
+  "simulation_rr80_n200_s5_CCA",
+  "simulation_rr60_n500_s5_CCA",
+  "simulation_rr70_n500_s5_CCA",
+  "simulation_rr80_n500_s5_CCA",
+  "simulation_rr60_n1000_s5_CCA",
+  "simulation_rr70_n1000_s5_CCA",
+  "simulation_rr80_n1000_s5_CCA"
+)
+
+
+for (ss in sample_sizes){
+  for (rr in response_rates){
+
+    iterno = 1
+    
+    # List for the CCA results
+    sample_proportions_list <- list()
+    
+    # Path where the CCA results for the 50000 iterations in scenario 5 are located
+    sim_files <- list.files(path = paste0("C:\\...\\Imputed data\\sample proportions\\s5\\n", ss, "\\RR", rr),
+                                          pattern = ".rds", full.names = T)
+    
+    # Looping through the 5000 files
+    for(file in sim_files){
+      sim_file <- readRDS(file)
+        sample_proportions_list[[iterno]] <- sim_file
+        iterno <- iterno + 1
+    }
+    
+  # Combining the results from the list
+    sample_proportions <- do.call(rbind, sample_proportions_list)
+      
+    # Calculating the mean proportions
+    sample_proportions_mean <- apply(sample_proportions, 2, mean)
+    
+    # Calculating the SD of each the proportions
+    sample_proportions_sd <- apply(sample_proportions, 2, sd)
+    
+    # Combining the results into a dataframe
+    sample_proportions <- as.data.frame(
+      cbind(sample_proportions_mean,
+            sample_proportions_sd))
+    
+    colnames(sample_proportions) <- c("ASP", "SD")
+    sample_proportions <- round(sample_proportions, 3)
+    
+    assign(result_filenames_list[[iter_list]], sample_proportions)
+    
+    iter_list = iter_list + 1
+
+    }
+  }
+
+# Saving the results
+save(simulation_rr60_n50_s5_CCA, file = "simulation_rr60_n50_s5_CCA.RData")
+save(simulation_rr70_n50_s5_CCA, file = "simulation_rr70_n50_s5_CCA.RData")
+save(simulation_rr80_n50_s5_CCA, file = "simulation_rr80_n50_s5_CCA.RData")
+save(simulation_rr60_n100_s5_CCA, file = "simulation_rr60_n100_s5_CCA.RData")
+save(simulation_rr70_n100_s5_CCA, file = "simulation_rr70_n100_s5_CCA.RData")
+save(simulation_rr80_n100_s5_CCA, file = "simulation_rr80_n100_s5_CCA.RData")
+save(simulation_rr60_n200_s5_CCA, file = "simulation_rr60_n200_s5_CCA.RData")
+save(simulation_rr70_n200_s5_CCA, file = "simulation_rr70_n200_s5_CCA.RData")
+save(simulation_rr80_n200_s5_CCA, file = "simulation_rr80_n200_s5_CCA.RData")
+save(simulation_rr60_n500_s5_CCA, file = "simulation_rr60_n500_s5_CCA.RData")
+save(simulation_rr70_n500_s5_CCA, file = "simulation_rr70_n500_s5_CCA.RData")
+save(simulation_rr80_n500_s5_CCA, file = "simulation_rr80_n500_s5_CCA.RData")
+save(simulation_rr60_n1000_s5_CCA, file = "simulation_rr60_n1000_s5_CCA.RData")
+save(simulation_rr70_n1000_s5_CCA, file = "simulation_rr70_n1000_s5_CCA.RData")
+save(simulation_rr80_n1000_s5_CCA, file = "simulation_rr80_n1000_s5_CCA.RData")
+
+```
+
+
+

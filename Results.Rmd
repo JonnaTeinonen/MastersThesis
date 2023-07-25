@@ -9,322 +9,592 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# PART 1: Creating Result Datasets
+# PART 1: Calculating the Pooled Parameters for Robust Methods
 
 ## 1.1 Robust Methods
 
 ```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)   # Sample sizes
+response_rates <- c(60, 70,  80)              # Response rates
+scenarios <- c(1, 2, 3, 4, 5)                 # Model scenario
 
-RR <- 60    # Response rate needs to changed  to match each dataset
-n <-  50   # Sample size needs to be changed to match each dataset
-s <- 1      # scenario needs to be changed to match each dataset
+# Looping the result files created in R script "simulation_code_main" for 
+# robust methods 
+for(s in scenarios){
+  for (ss in sample_sizes){
+    for (rr in response_rates){
+      
+      # # Path where the result files for the robust methods are located
+        file_name <- paste0("C:..\\robust\\results\\simulation_rr", rr, "_n", ss, "_s", s, "_robust.RData")
+        load(file_name)
+  
+      }
+    }
+  }
+ 
 ```
 
 
 ```{r}
-# Filename of the dataset of certain condition combination
-file_name <- paste0("F://Thesis Project//R code//Main_draft//Finished Datasets//Sample size 50//simulation_rr", RR, "_n", n, "_s", s, "_robust.RData")
-load(file_name)
+# List of the wanted parameters: 
+# scenario, response rate, sample size
+param_list <- list(
+  list(1, 60, 50      ) ,
+  list(1, 70, 50      ) ,
+  list(1, 80, 50      ) ,
+  list(1, 60, 100     ) ,
+  list(1, 70, 100     ) ,
+  list(1, 80, 100     ) ,
+  list(1, 60, 200     ) ,
+  list(1, 70, 200     ) ,
+  list(1, 80, 200     ) ,
+  list(1, 60, 500     ) ,
+  list(1, 70, 500     ) ,
+  list(1, 80, 500     ) ,
+  list(1, 60, 1000    ) ,
+  list(1, 70, 1000    ) ,
+  list(1, 80, 1000    ) ,
+  list(2, 60, 50      ) ,
+  list(2, 70, 50      ) ,
+  list(2, 80, 50      ) ,
+  list(2, 60, 100     ) ,
+  list(2, 70, 100     ) ,
+  list(2, 80, 100     ) ,
+  list(2, 60, 200     ) ,
+  list(2, 70, 200     ) ,
+  list(2, 80, 200     ) ,
+  list(2, 60, 500     ) ,
+  list(2, 70, 500     ) ,
+  list(2, 80, 500     ) ,
+  list(2, 60, 1000    ) ,
+  list(2, 70, 1000    ) ,
+  list(2, 80, 1000    ) ,
+  list(3, 60, 50      ) ,
+  list(3, 70, 50      ) ,
+  list(3, 80, 50      ) ,
+  list(3, 60, 100     ) ,
+  list(3, 70, 100     ) ,
+  list(3, 80, 100     ) ,
+  list(3, 60, 200     ) ,
+  list(3, 70, 200     ) ,
+  list(3, 80, 200     ) ,
+  list(3, 60, 500     ) ,
+  list(3, 70, 500     ) ,
+  list(3, 80, 500     ) ,
+  list(3, 60, 1000    ) ,
+  list(3, 70, 1000    ) ,
+  list(3, 80, 1000    ) ,
+  list(4, 60, 50      ) ,
+  list(4, 70, 50      ) ,
+  list(4, 80, 50      ) ,
+  list(4, 60, 100     ) ,
+  list(4, 70, 100     ) ,
+  list(4, 80, 100     ) ,
+  list(4, 60, 200     ) ,
+  list(4, 70, 200     ) ,
+  list(4, 80, 200     ) ,
+  list(4, 60, 500     ) ,
+  list(4, 70, 500     ) ,
+  list(4, 80, 500     ) ,
+  list(4, 60, 1000    ) ,
+  list(4, 70, 1000    ) ,
+  list(4, 80, 1000    ) ,
+  list(5, 60, 50      ) ,
+  list(5, 70, 50      ) ,
+  list(5, 80, 50      ) ,
+  list(5, 60, 100     ) ,
+  list(5, 70, 100     ) ,
+  list(5, 80, 100     ) ,
+  list(5, 60, 200     ) ,
+  list(5, 70, 200     ) ,
+  list(5, 80, 200     ) ,
+  list(5, 60, 500     ) ,
+  list(5, 70, 500     ) ,
+  list(5, 80, 500     ) ,
+  list(5, 60, 1000    ) ,
+  list(5, 70, 1000    ) ,
+  list(5, 80, 1000    )
+)
+```
+
+```{r}
+# Names of the loaded result files
+result_list <- list(
+  simulation_rr60_n50_s1_robust,
+  simulation_rr70_n50_s1_robust,
+  simulation_rr80_n50_s1_robust,
+  simulation_rr60_n100_s1_robust,
+  simulation_rr70_n100_s1_robust,
+  simulation_rr80_n100_s1_robust,
+  simulation_rr60_n200_s1_robust,
+  simulation_rr70_n200_s1_robust,
+  simulation_rr80_n200_s1_robust,
+  simulation_rr60_n500_s1_robust,
+  simulation_rr70_n500_s1_robust,
+  simulation_rr80_n500_s1_robust,
+  simulation_rr60_n1000_s1_robust,
+  simulation_rr70_n1000_s1_robust,
+  simulation_rr80_n1000_s1_robust,
+  simulation_rr60_n50_s2_robust,
+  simulation_rr70_n50_s2_robust,
+  simulation_rr80_n50_s2_robust,
+  simulation_rr60_n100_s2_robust,
+  simulation_rr70_n100_s2_robust,
+  simulation_rr80_n100_s2_robust,
+  simulation_rr60_n200_s2_robust,
+  simulation_rr70_n200_s2_robust,
+  simulation_rr80_n200_s2_robust,
+  simulation_rr60_n500_s2_robust,
+  simulation_rr70_n500_s2_robust,
+  simulation_rr80_n500_s2_robust,
+  simulation_rr60_n1000_s2_robust,
+  simulation_rr70_n1000_s2_robust,
+  simulation_rr80_n1000_s2_robust,
+  simulation_rr60_n50_s3_robust,
+  simulation_rr70_n50_s3_robust,
+  simulation_rr80_n50_s3_robust,
+  simulation_rr60_n100_s3_robust,
+  simulation_rr70_n100_s3_robust,
+  simulation_rr80_n100_s3_robust,
+  simulation_rr60_n200_s3_robust,
+  simulation_rr70_n200_s3_robust,
+  simulation_rr80_n200_s3_robust,
+  simulation_rr60_n500_s3_robust,
+  simulation_rr70_n500_s3_robust,
+  simulation_rr80_n500_s3_robust,
+  simulation_rr60_n1000_s3_robust,
+  simulation_rr70_n1000_s3_robust,
+  simulation_rr80_n1000_s3_robust,
+  simulation_rr60_n50_s4_robust,
+  simulation_rr70_n50_s4_robust,
+  simulation_rr80_n50_s4_robust,
+  simulation_rr60_n100_s4_robust,
+  simulation_rr70_n100_s4_robust,
+  simulation_rr80_n100_s4_robust,
+  simulation_rr60_n200_s4_robust,
+  simulation_rr70_n200_s4_robust,
+  simulation_rr80_n200_s4_robust,
+  simulation_rr60_n500_s4_robust,
+  simulation_rr70_n500_s4_robust,
+  simulation_rr80_n500_s4_robust,
+  simulation_rr60_n1000_s4_robust,
+  simulation_rr70_n1000_s4_robust,
+  simulation_rr80_n1000_s4_robust,
+  simulation_rr60_n50_s5_robust,
+  simulation_rr70_n50_s5_robust,
+  simulation_rr80_n50_s5_robust,
+  simulation_rr60_n100_s5_robust,
+  simulation_rr70_n100_s5_robust,
+  simulation_rr80_n100_s5_robust,
+  simulation_rr60_n200_s5_robust,
+  simulation_rr70_n200_s5_robust,
+  simulation_rr80_n200_s5_robust,
+  simulation_rr60_n500_s5_robust,
+  simulation_rr70_n500_s5_robust,
+  simulation_rr80_n500_s5_robust,
+  simulation_rr60_n1000_s5_robust,
+  simulation_rr70_n1000_s5_robust,
+  simulation_rr80_n1000_s5_robust
+)
 ```
 
 
 ```{r}
-# needs to be changed to match the name of the loaded dataset
-PP_results <- simulation_rr60_n50_s1_robust 
+# Looping each robust result file
+for (idx in 1:length(result_list)){
+  
+  PP_results <- result_list[[idx]]
+  s  <- param_list[[idx]][[1]]
+  rr <- param_list[[idx]][[2]]
+  n  <- param_list[[idx]][[3]]
+  
+  # List of the results for each category of Y
+  Yc1_APP_data <- list()
+  Yc2_APP_data <- list()
+  Yc3_APP_data <- list()
+  combined_data <- list()
+  
+  # Looping the results of each method
+  for (i in 1:length(PP_results)){
+    
+    # Binds the results of the same method during different iterations 
+    # into a same data frame
+    binded_data <- do.call(rbind, PP_results[[i]])
+  
+    # Calculating pooled parameters: MEP, MSE, SD and CR for each 
+    # category of Y
+    Yc1_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 1, c(1, 2)]),
+                           sd(binded_data[binded_data$var == 1, 1]),
+                           mean(binded_data[binded_data$var == 1, 5]))
+    names(Yc1_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
+    
+    
+    Yc2_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 2, c(1, 2)]),
+                           sd(binded_data[binded_data$var == 2, 1]),
+                           mean(binded_data[binded_data$var == 2, 5]))
+    
+    names(Yc2_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
+    
+    Yc3_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 3, c(1, 2)]),
+                           sd(binded_data[binded_data$var == 3, 1]),
+                           mean(binded_data[binded_data$var == 3, 5]))
+    
+    names(Yc3_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
+    
+    combined_data[[i]] <- binded_data  # Saves the binded data
+    combined_data[[i]]$method <- i     # Saves the method as a number
+  
+  }
+  
+    # Adding the method numbers and categories of Y
+    # NOTE:
+    # 1 = MRIC R2 MF
+    # 2 = MRIC R2 MF
+    # 3 = MRIC R2 CS
+    # 4 = MRIC R2 N
+    # 5 = MRIC AIC
+    # 6 = MRIC HL
+    # 7 = MRNNMI
+    # 8 = DRNNMI
+    # 9 = MRPMMI
+    Yc1_APP_data2 <- as.data.frame(do.call(rbind,Yc1_APP_data))
+    Yc1_APP_data2$method <- c(1, 2, 3, 4, 5, 6, 7, 8, 9) # MI method 
+    Yc1_APP_data2$level <- 1 # Category of Y
+    
+    Yc2_APP_data2 <- as.data.frame(do.call(rbind,Yc2_APP_data))
+    Yc2_APP_data2$method <- c(1, 2, 3, 4, 5, 6, 7, 8, 9)
+    Yc2_APP_data2$level <- 2
+    
+    Yc3_APP_data2 <- as.data.frame(do.call(rbind,Yc3_APP_data))
+    Yc3_APP_data2$method <- c(1, 2, 3, 4, 5, 6, 7, 8, 9)
+    Yc3_APP_data2$level <- 3 
+    
+    # Combining all pooled parameters into one dataframe for tables and figures
+    pooled_param_data_all_temp <- do.call(rbind, list(Yc1_APP_data2, 
+                                                      Yc2_APP_data2, 
+                                                      Yc3_APP_data2))
+    
+    # Adding sample size, response rate and working scenario number
+    pooled_param_data_all_temp$n <- n
+    pooled_param_data_all_temp$RR <- rr
+    pooled_param_data_all_temp$scenario <- s
+    pooled_param_data_all_temp
+
+    # Saving the dataset
+    file_name <- paste0("C:\\...\\robust\\pooled_robust_results_rr", rr, "_n", n, "_s", s, ".rds")
+      
+    saveRDS(pooled_param_data_all_temp, file = file_name)
+    
+    # Saving the combined datasets into one dataframe (used for figures)
+    combined_data_all_temp <- do.call(rbind, combined_data)
+    
+    # Adding sample size, response rate and working model scenario number
+    combined_data_all_temp$n <- n
+    combined_data_all_temp$RR <- rr
+    combined_data_all_temp$scenario <- s
+    
+    # Saving the data
+    file_name <- paste0("C:\...\\robust\\combined_robust_results_rr", rr, "_n", n, "_s", s, ".rds")
+     saveRDS(combined_data_all_temp, file = file_name)
+
+    
+     
+}
+
+
 ```
 
 
+
+
+## # PART 1: Calculating the Pooled Parameters for MICE variants
+
 ```{r}
+sample_sizes <-  c(50, 100, 200, 500, 1000)
+response_rates <- c(60, 70,  80)
+scenarios <- c(1, 2, 3, 4, 5)
 
-# List of the results for each category of Y
-Yc1_APP_data <- list()
-Yc2_APP_data <- list()
-Yc3_APP_data <- list()
-combined_data <- list()
-
-# Looping the results of each method
-for (i in 1:length(PP_results)){
+# Looping the result files created in R script "simulation_code_main" for 
+# MICE variants
+for(s in scenarios){
+  for (ss in sample_sizes){
+    for (rr in response_rates){
+        
+        # Path where the result files for the MICE variants are located
+        file_name <- paste0("C:\\...\\mice\\results\\simulation_rr", rr, "_n", ss, "_s", s, "_MICE.RData")
+        load(file_name)
   
-  # Binds the results of the same method during different iterations into a
-  # same data frame
-  binded_data <- do.call(rbind, PP_results[[i]])
-
-  # Calculating pooled parameters: MEP, MSE, SD and CR for each category of Y
-  Yc1_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 1, c(1, 2)]),
-                         sd(binded_data[binded_data$var == 1, 1]),
-                         mean(binded_data[binded_data$var == 1, 5]))
-  names(Yc1_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
-  
-  
-  Yc2_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 2, c(1, 2)]),
-                         sd(binded_data[binded_data$var == 2, 1]),
-                         mean(binded_data[binded_data$var == 2, 5]))
-  
-  names(Yc2_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
-  
-  Yc3_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 3, c(1, 2)]),
-                         sd(binded_data[binded_data$var == 3, 1]),
-                         mean(binded_data[binded_data$var == 3, 5]))
-  
-  names(Yc3_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
-  
-  combined_data[[i]] <- binded_data # Saves the binded data
-  combined_data[[i]]$method <- i # Saves the method as a number
-
+      }
+    }
   }
 
-
 ```
 
 
-Results of each robust MI method for each Y category:
+```{r}
+# Parameter list:
+# scenario, response rate, sample size
+param_list <- list(
+  list(1, 60, 50      ) ,
+  list(1, 70, 50      ) ,
+  list(1, 80, 50      ) ,
+  list(1, 60, 100     ) ,
+  list(1, 70, 100     ) ,
+  list(1, 80, 100     ) ,
+  list(1, 60, 200     ) ,
+  list(1, 70, 200     ) ,
+  list(1, 80, 200     ) ,
+  list(1, 60, 500     ) ,
+  list(1, 70, 500     ) ,
+  list(1, 80, 500     ) ,
+  list(1, 60, 1000    ) ,
+  list(1, 70, 1000    ) ,
+  list(1, 80, 1000    ) ,
+  list(2, 60, 50      ) ,
+  list(2, 70, 50      ) ,
+  list(2, 80, 50      ) ,
+  list(2, 60, 100     ) ,
+  list(2, 70, 100     ) ,
+  list(2, 80, 100     ) ,
+  list(2, 60, 200     ) ,
+  list(2, 70, 200     ) ,
+  list(2, 80, 200     ) ,
+  list(2, 60, 500     ) ,
+  list(2, 70, 500     ) ,
+  list(2, 80, 500     ) ,
+  list(2, 60, 1000    ) ,
+  list(2, 70, 1000    ) ,
+  list(2, 80, 1000    ) ,
+  list(3, 60, 50      ) ,
+  list(3, 70, 50      ) ,
+  list(3, 80, 50      ) ,
+  list(3, 60, 100     ) ,
+  list(3, 70, 100     ) ,
+  list(3, 80, 100     ) ,
+  list(3, 60, 200     ) ,
+  list(3, 70, 200     ) ,
+  list(3, 80, 200     ) ,
+  list(3, 60, 500     ) ,
+  list(3, 70, 500     ) ,
+  list(3, 80, 500     ) ,
+  list(3, 60, 1000    ) ,
+  list(3, 70, 1000    ) ,
+  list(3, 80, 1000    ) ,
+  list(4, 60, 50      ) ,
+  list(4, 70, 50      ) ,
+  list(4, 80, 50      ) ,
+  list(4, 60, 100     ) ,
+  list(4, 70, 100     ) ,
+  list(4, 80, 100     ) ,
+  list(4, 60, 200     ) ,
+  list(4, 70, 200     ) ,
+  list(4, 80, 200     ) ,
+  list(4, 60, 500     ) ,
+  list(4, 70, 500     ) ,
+  list(4, 80, 500     ) ,
+  list(4, 60, 1000    ) ,
+  list(4, 70, 1000    ) ,
+  list(4, 80, 1000    ) ,
+  list(5, 60, 50      ) ,
+  list(5, 70, 50      ) ,
+  list(5, 80, 50      ) ,
+  list(5, 60, 100     ) ,
+  list(5, 70, 100     ) ,
+  list(5, 80, 100     ) ,
+  list(5, 60, 200     ) ,
+  list(5, 70, 200     ) ,
+  list(5, 80, 200     ) ,
+  list(5, 60, 500     ) ,
+  list(5, 70, 500     ) ,
+  list(5, 80, 500     ) ,
+  list(5, 60, 1000    ) ,
+  list(5, 70, 1000    ) ,
+  list(5, 80, 1000    )
+)
+```
 
 ```{r}
-# Results of Category 1
-Yc1_APP_data3 <- Yc1_APP_data
-names(Yc1_APP_data3) <- c("MRIC_R2MF", "MRIC_R2CS", "MRIC_R2MZ","MRIC_R2N", 
-                         "MRIC_AIC", "MRIC_HL", "MRNNMI", "DRNNMI", "MRPMMI")
+# Names of the loaded result files
+result_list <- list(
+  simulation_rr60_n50_s1_MICE,
+  simulation_rr70_n50_s1_MICE,
+  simulation_rr80_n50_s1_MICE,
+  simulation_rr60_n100_s1_MICE,
+  simulation_rr70_n100_s1_MICE,
+  simulation_rr80_n100_s1_MICE,
+  simulation_rr60_n200_s1_MICE,
+  simulation_rr70_n200_s1_MICE,
+  simulation_rr80_n200_s1_MICE,
+  simulation_rr60_n500_s1_MICE,
+  simulation_rr70_n500_s1_MICE,
+  simulation_rr80_n500_s1_MICE,
+  simulation_rr60_n1000_s1_MICE,
+  simulation_rr70_n1000_s1_MICE,
+  simulation_rr80_n1000_s1_MICE,
+  simulation_rr60_n50_s2_MICE,
+  simulation_rr70_n50_s2_MICE,
+  simulation_rr80_n50_s2_MICE,
+  simulation_rr60_n100_s2_MICE,
+  simulation_rr70_n100_s2_MICE,
+  simulation_rr80_n100_s2_MICE,
+  simulation_rr60_n200_s2_MICE,
+  simulation_rr70_n200_s2_MICE,
+  simulation_rr80_n200_s2_MICE,
+  simulation_rr60_n500_s2_MICE,
+  simulation_rr70_n500_s2_MICE,
+  simulation_rr80_n500_s2_MICE,
+  simulation_rr60_n1000_s2_MICE,
+  simulation_rr70_n1000_s2_MICE,
+  simulation_rr80_n1000_s2_MICE,
+  simulation_rr60_n50_s3_MICE,
+  simulation_rr70_n50_s3_MICE,
+  simulation_rr80_n50_s3_MICE,
+  simulation_rr60_n100_s3_MICE,
+  simulation_rr70_n100_s3_MICE,
+  simulation_rr80_n100_s3_MICE,
+  simulation_rr60_n200_s3_MICE,
+  simulation_rr70_n200_s3_MICE,
+  simulation_rr80_n200_s3_MICE,
+  simulation_rr60_n500_s3_MICE,
+  simulation_rr70_n500_s3_MICE,
+  simulation_rr80_n500_s3_MICE,
+  simulation_rr60_n1000_s3_MICE,
+  simulation_rr70_n1000_s3_MICE,
+  simulation_rr80_n1000_s3_MICE,
+  simulation_rr60_n50_s4_MICE,
+  simulation_rr70_n50_s4_MICE,
+  simulation_rr80_n50_s4_MICE,
+  simulation_rr60_n100_s4_MICE,
+  simulation_rr70_n100_s4_MICE,
+  simulation_rr80_n100_s4_MICE,
+  simulation_rr60_n200_s4_MICE,
+  simulation_rr70_n200_s4_MICE,
+  simulation_rr80_n200_s4_MICE,
+  simulation_rr60_n500_s4_MICE,
+  simulation_rr70_n500_s4_MICE,
+  simulation_rr80_n500_s4_MICE,
+  simulation_rr60_n1000_s4_MICE,
+  simulation_rr70_n1000_s4_MICE,
+  simulation_rr80_n1000_s4_MICE,
+  simulation_rr60_n50_s5_MICE,
+  simulation_rr70_n50_s5_MICE,
+  simulation_rr80_n50_s5_MICE,
+  simulation_rr60_n100_s5_MICE,
+  simulation_rr70_n100_s5_MICE,
+  simulation_rr80_n100_s5_MICE,
+  simulation_rr60_n200_s5_MICE,
+  simulation_rr70_n200_s5_MICE,
+  simulation_rr80_n200_s5_MICE,
+  simulation_rr60_n500_s5_MICE,
+  simulation_rr70_n500_s5_MICE,
+  simulation_rr80_n500_s5_MICE,
+  simulation_rr60_n1000_s5_MICE,
+  simulation_rr70_n1000_s5_MICE,
+  simulation_rr80_n1000_s5_MICE
+)
+```
 
-for(i in 1:length(Yc1_APP_data3)){
-  Yc1_APP_data3[i] <- lapply(Yc1_APP_data3[i], round, 3)
+
+```{r}
+# Looping each MICE result file
+for (idx in 1:length(result_list)){
+  
+  PP_results <- result_list[[idx]]
+  s  <- param_list[[idx]][[1]]
+  rr <- param_list[[idx]][[2]]
+  n  <- param_list[[idx]][[3]]
+  
+   # List for the results of each category of Y and for all the results
+  Yc1_APP_data <- list()
+  Yc2_APP_data <- list()
+  Yc3_APP_data <- list()
+  combined_data <- list()
+  
+  # looping the results of each MICE variant
+  for (i in 1:length(PP_results)){
+    
+    # binds the results of the same method during different iterations into a
+    # same data frame
+    binded_data <- do.call(rbind, PP_results[[i]])
+  
+    # Calculates pooled parameters: MEP, MSE, SD and CR for each category of Y
+    Yc1_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 1, c(1, 2)]),
+                           sd(binded_data[binded_data$var == 1, 1]),
+                           mean(binded_data[binded_data$var == 1, 5]))
+    names(Yc1_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
+    
+    
+    Yc2_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 2, c(1, 2)]),
+                           sd(binded_data[binded_data$var == 2, 1]),
+                           mean(binded_data[binded_data$var == 2, 5]))
+    
+    names(Yc2_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
+    
+    Yc3_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 3, c(1, 2)]),
+                           sd(binded_data[binded_data$var == 3, 1]),
+                           mean(binded_data[binded_data$var == 3, 5]))
+    
+    names(Yc3_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
+    
+    combined_data[[i]] <- binded_data
+    combined_data[[i]]$method <- i
+  
+    }
+
+  
+    # Combining the results from each list and adding method number and the
+    # category level of Y
+   # NOTE:
+    # 10 = MICE default
+    # 11 = MICE CM
+    # 12 = MICE INM
+    # 13 = MICE INNM
+    Yc1_APP_data2 <- as.data.frame(do.call(rbind,Yc1_APP_data))
+    Yc1_APP_data2$method <- c(10, 11, 12, 13)
+    Yc1_APP_data2$level <- 1 # Category of Y
+    
+    Yc2_APP_data2 <- as.data.frame(do.call(rbind,Yc2_APP_data))
+    Yc2_APP_data2$method <- c(10, 11, 12, 13)
+    Yc2_APP_data2$level <- 2
+    
+    Yc3_APP_data2 <- as.data.frame(do.call(rbind,Yc3_APP_data))
+    Yc3_APP_data2$method <- c(10, 11, 12, 13)
+    Yc3_APP_data2$level <- 3 
+    
+    # Combining the pooled results into a same dataframe
+    pooled_param_data_all_temp <- do.call(rbind, list(Yc1_APP_data2, Yc2_APP_data2, Yc3_APP_data2))
+    pooled_param_data_all_temp$n <- n
+    pooled_param_data_all_temp$RR <- rr
+    pooled_param_data_all_temp$scenario <- s
+    pooled_param_data_all_temp
+    
+    # Saving the results
+    file_name <- paste0("C:\\...\\Pooled results\\pooled_MICE_results_rr", rr, "_n", n, "_s", s, ".rds")
+      
+    saveRDS(pooled_param_data_all_temp, file = file_name)
+    
+    # Saving the data from each separate iteration for each method
+    combined_data_all_temp <- do.call(rbind, combined_data)
+    combined_data_all_temp[combined_data_all_temp$method == 1, 8] <- 10
+    combined_data_all_temp[combined_data_all_temp$method == 2, 8] <- 11
+    combined_data_all_temp[combined_data_all_temp$method == 3, 8] <- 12
+    combined_data_all_temp[combined_data_all_temp$method == 4, 8] <- 13
+    
+    # Adding sample size, response rate and working model scenario number
+    combined_data_all_temp$n <- n
+    combined_data_all_temp$RR <- rr
+    combined_data_all_temp$scenario <- s
+    combined_data_all_temp
+    
+    # Saving the data
+    file_name <- paste0("C:\\...\\Combined result\\mice\\combined_MICE_results_rr", rr, "_n",n, "_s", s, ".rds")
+     saveRDS(combined_data_all_temp, file = file_name)
+         
 }
-Yc1_APP_data3
-
-```
-
-
-
-```{r}
-# Results of Category 2
-Yc2_APP_data3 <- Yc2_APP_data
-names(Yc2_APP_data3) <-  c("MRIC_R2MF", "MRIC_R2CS", "MRIC_R2MZ","MRIC_R2N", 
-                         "MRIC_AIC", "MRIC_HL", "MRNNMI", "DRNNMI", "MRPMMI")
-
-for(i in 1:length(Yc2_APP_data3)){
-  Yc2_APP_data3[i] <- lapply(Yc2_APP_data3[i], round, 3)
-}
-
-Yc2_APP_data3
-```
-
-
-```{r}
-# Results of category 3
-Yc3_APP_data3 <- Yc3_APP_data
-names(Yc3_APP_data3) <-  c("MRIC_R2MF", "MRIC_R2CS", "MRIC_R2MZ","MRIC_R2N", 
-                         "MRIC_AIC", "MRIC_HL", "MRNNMI", "DRNNMI", "MRPMMI")
-
-for(i in 1:length(Yc3_APP_data3)){
-  Yc3_APP_data3[i] <- lapply(Yc3_APP_data3[i], round, 3)
-}
-
-Yc3_APP_data3
-```
-
-
-Creating datasets for tables and plots
-
-```{r}
-# Addinf the method numbers and categories of Y
-Yc1_APP_data2 <- as.data.frame(do.call(rbind,Yc1_APP_data))
-Yc1_APP_data2$method <- c(1, 2, 3, 4, 5, 6, 7, 8, 9) # MI method numbers
-Yc1_APP_data2$level <- 1 # Category level
-
-Yc2_APP_data2 <- as.data.frame(do.call(rbind,Yc2_APP_data))
-Yc2_APP_data2$method <- c(1, 2, 3, 4, 5, 6, 7, 8, 9)
-Yc2_APP_data2$level <- 2
-
-Yc3_APP_data2 <- as.data.frame(do.call(rbind,Yc3_APP_data))
-Yc3_APP_data2$method <- c(1, 2, 3, 4, 5, 6, 7, 8, 9)
-Yc3_APP_data2$level <- 3 
-
-# Combining all results into one dataframe for outputs
-pooled_param_data_all_temp <- do.call(rbind, list(Yc1_APP_data2, 
-                                                  Yc2_APP_data2, 
-                                                  Yc3_APP_data2))
-
-# adding sample size, response rate and working scenario number
-pooled_param_data_all_temp$n <- n
-pooled_param_data_all_temp$RR <- RR
-pooled_param_data_all_temp$scenario <- s
-pooled_param_data_all_temp
-
-# Saving the dataset
-file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\All pooled results\\pooled_robust_results_rr", RR, "_n", n, "_s", s, ".rds")
-  
-saveRDS(pooled_param_data_all_temp, file = file_name)
 
 
 ```
 
-
-```{r}
-# Saving the ocmbined datasets into one dataframe
-combined_data_all_temp <- do.call(rbind, combined_data)
-
-# Adding sample size, response rate and working model scenario number
-combined_data_all_temp$n <- n
-combined_data_all_temp$RR <- RR
-combined_data_all_temp$scenario <- s
-combined_data_all_temp
-
-# Saving the data
-file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\Combined results\\combined_robust_results_rr", RR, "_n", n, "_s", s, ".rds")
- saveRDS(combined_data_all_temp, file = file_name)
-
-```
-
-
-## 1.2 MICE
-
-```{r}
-
-RR <- 70    # Response rate needs to changed  to match each dataset
-n <-  50   # Sample size needs to be changed to match each dataset
-s <- 2      # scenario needs to be changed to match each dataset
-```
-
-
-```{r}
-file_name <- paste0("F://Thesis Project//R code//Main_draft//Finished Datasets//MICE//simulation_rr", RR, "_n", n, "_s", s, "_MICE.RData")
-load(file_name)
-```
-
-
-```{r}
-# nNeds to be changed to match the name of the loaded dataset
-PP_results <- simulation_rr70_n50_s2_MICE 
-```
-
-```{r}
-# List for the results of each category of Y and for all the results
-Yc1_APP_data <- list()
-Yc2_APP_data <- list()
-Yc3_APP_data <- list()
-combined_data <- list()
-
-# looping the results of each MICE variant
-for (i in 1:length(PP_results)){
-  
-  # binds the results of the same method during different iterations into a
-  # same data frame
-  binded_data <- do.call(rbind, PP_results[[i]])
-
-  # Calculates pooled parameters: MEP, MSE, SD and CR for each category of Y
-  Yc1_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 1, c(1, 2)]),
-                         sd(binded_data[binded_data$var == 1, 1]),
-                         mean(binded_data[binded_data$var == 1, 5]))
-  names(Yc1_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
-  
-  
-  Yc2_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 2, c(1, 2)]),
-                         sd(binded_data[binded_data$var == 2, 1]),
-                         mean(binded_data[binded_data$var == 2, 5]))
-  
-  names(Yc2_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
-  
-  Yc3_APP_data[[i]] <- c(colMeans(binded_data[binded_data$var == 3, c(1, 2)]),
-                         sd(binded_data[binded_data$var == 3, 1]),
-                         mean(binded_data[binded_data$var == 3, 5]))
-  
-  names(Yc3_APP_data[[i]]) <- c("Est", "SE", "SD", "CR")
-  
-  combined_data[[i]] <- binded_data
-  combined_data[[i]]$method <- i
-
-  }
-
-
-```
-
-
-Results of each MICE method for this condition:
-
-```{r}
-# Results for category 1
-names(Yc1_APP_data) <- c("MICE0", "MICE_CM", "MICE_INM", "MICE_INNM")
-
-for(i in 1:length(Yc1_APP_data)){
-  Yc1_APP_data[i] <- lapply(Yc1_APP_data[i], round, 3)
-}
-Yc1_APP_data
-
-```
-
-
-
-```{r}
-# Results for category 2
-names(Yc2_APP_data) <-  c("MICE0", "MICE_CM", "MICE_INM", "MICE_INNM")
-
-for(i in 1:length(Yc2_APP_data)){
-  Yc2_APP_data[i] <- lapply(Yc2_APP_data[i], round, 3)
-}
-
-Yc2_APP_data
-```
-
-
-```{r}
-# Results for category 3
-names(Yc3_APP_data) <-   c("MICE0", "MICE_CM", "MICE_INM", "MICE_INNM")
-
-for(i in 1:length(Yc3_APP_data)){
-  Yc3_APP_data[i] <- lapply(Yc3_APP_data[i], round, 3)
-}
-
-Yc3_APP_data
-```
-
-
-```{r}
-# Combining the results from each list anf adding method number and the
-# category level of Y
-Yc1_APP_data2 <- as.data.frame(do.call(rbind,Yc1_APP_data))
-Yc1_APP_data2$method <- c(10, 11, 12, 13)
-Yc1_APP_data2$level <- 1
-
-Yc2_APP_data2 <- as.data.frame(do.call(rbind,Yc2_APP_data))
-Yc2_APP_data2$method <- c(10, 11, 12, 13)
-Yc2_APP_data2$level <- 2
-
-Yc3_APP_data2 <- as.data.frame(do.call(rbind,Yc3_APP_data))
-Yc3_APP_data2$method <- c(10, 11, 12, 13)
-Yc3_APP_data2$level <- 3 
-
-# Combibing the avergae estimated pooled results into a same dataframe
-pooled_param_data_all_temp <- do.call(rbind, list(Yc1_APP_data2, Yc2_APP_data2, Yc3_APP_data2))
-pooled_param_data_all_temp$n <- n
-pooled_param_data_all_temp$RR <- RR
-pooled_param_data_all_temp$scenario <- s
-pooled_param_data_all_temp
-
-# Saving the results
-file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\All pooled results\\pooled_MICE_results_rr", RR, "_n", n, "_s", s, ".rds")
-  
-saveRDS(pooled_param_data_all_temp, file = file_name)
-
-```
-
-```{r}
-# Saving the data from each separate iteration for each method
-combined_data_all_temp <- do.call(rbind, combined_data)
-combined_data_all_temp[combined_data_all_temp$method == 1, 8] <- 10
-combined_data_all_temp[combined_data_all_temp$method == 2, 8] <- 11
-combined_data_all_temp[combined_data_all_temp$method == 3, 8] <- 12
-combined_data_all_temp[combined_data_all_temp$method == 4, 8] <- 13
-
-# Adding sample size, response rate and working model scenario number
-combined_data_all_temp$n <- n
-combined_data_all_temp$RR <- RR
-combined_data_all_temp$scenario <- s
-combined_data_all_temp
-
-# Saving the data
-file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\Combined results\\combined_MICE_results_rr", RR, "_n",n, "_s", s, ".rds")
- saveRDS(combined_data_all_temp, file = file_name)
-
-```
 
 ## 1.3 Combining all results
 
@@ -332,12 +602,12 @@ file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\
 # A list to combine the results of the robust methods and MICE variants
 all_combined_results_list <- list()
 
-# NOTE: The file has to include all the combined files created for all the
+# NOTE: The folder has to include all the combined files created for all the
 # methods in each condition combination
-combined_files <- list.files(path = "F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\Combined results",
+combined_files <- list.files(path = "C:\\...\\Combined results",
                                       pattern = ".rds", full.names = T)
 
-# Looping through each saved "comdined_data" file
+# Looping each saved "comdined_data" file
 iterno <- 1
 for(file in combined_files){
   combined_file <- readRDS(file)
@@ -350,9 +620,8 @@ for(file in combined_files){
 ```
 
 
-
 ```{r}
-# Combibing all the results from the lists
+# Combining all the results from the lists
 all_combined_results <- do.call(rbind, all_combined_results_list)
 
 # Changing categorical variables into factors
@@ -367,57 +636,67 @@ save(all_combined_results, file = "all_combined_results.RData")
 ```
 
 
-## 1.4 Error Checking
+## 1.4 Complete Case Analysis (CCA)
+
+```{r}
+# Reading CCA for one specific condition combination
+# -> parameters in the path need to be changed to match the right condition
+
+n <- 1000
+RR <- 80
+s <- 4
+
+# The file includes ASP and SD in columns and rows represent the categories
+# of Y
+load(paste0("C:\\...\\sample proportions\\simulation_rr", RR, "_n", n, "_s",s, "_CCA.RData"))
+
+# simulation_rr60_n50_s1_CCA
+```
+
+
+## 1.5 (HL) Error Checking
 
 Calculating HL errors during simulation.
 
 ```{r}
-# Loading the iteration information file that includes the error checks
-# NOTE: The name of the file needs to be changed to match the correct conditions
-load("F:/Thesis Project/R code/Main_draft/Finished Datasets/Error checking/Sample size 1000/simulation_rr80_n1000_s5_robust_it_inf.RData")
+# Checking the error counts for robust for each condition by opening the
+# correct "it inf" file
+
+# NOTE: the the parameters in the path needs to be changed to match the right 
+# condition combination
+error_count<- readRDS("C://...//robust//it info//simulation_rr80_n1000_s5_robust_it_inf.rds")
+round(error_count, 3)
+
+
 ```
 
 ```{r}
-round(simulation_rr80_n500_s5_robust_it_inf, 3)
+# Checking the error counts for MICE for each condition by opening the
+# correct "it inf" file
+
+# NOTE: the the parameters in the path needs to be changed to match the right 
+# condition combination
+error_count<- readRDS("C://...//mice//it info//simulation_rr80_n1000_s5_MICE_it_inf.rds")
+round(error_count, 3)
+
+
 ```
-
-
-```{r}
-# Combibing the information/error counts from each iteration into a same list
-all_it_info_list <- list()
-
-# NOTE: The file has to include only the the files that have information about
-# the error ocunts for all the methods in each condition combination
-combined_files <- list.files(path = "F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\Combined results",
-                                      pattern = ".rds", full.names = T)
-
-iterno <- 1
-for(file in combined_files){
-  combined_file <- readRDS(file)
-
-    all_combined_results_list[[iterno]] <- combined_file
-    iterno <- iterno + 1
-
-}
-```
-
-
-
 
 
 
 # PART 2: PLOTS
 
-After all the pooled average results have been saved, the files are looped to
-combine them for the general figures.  
 
 ```{r}
+# After all the pooled estimates have been saved, the files are looped to
+# combine them for the general figures.  
+
 # List for all the pooled parameters results
 all_pooled_results_list <- list()
 
 # File path in which all the pooled parameter files are located
-pooled_files <- list.files(path = "F:\\Thesis Project\\R code\\Main_draft\\Finished Datasets\\All pooled results",
-                                      pattern = ".rds", full.names = T)
+pooled_files <- list.files(path = "C:\\...\\Pooled results",
+                           pattern = ".rds", full.names = T)
 
 iterno <- 1
 
@@ -434,7 +713,7 @@ for(file in pooled_files){
 
 
 ```{r}
-#Combining all the pooled results from the list
+# Combining all the pooled results from the list
 all_pooled_results <- do.call(rbind, all_pooled_results_list)
 
 # Changing all categorical variables into factors
@@ -446,8 +725,8 @@ all_pooled_results$scenario <- as.factor(all_pooled_results$scenario)
 ```
 
 ```{r}
-# Creating a grouping variable: proposed methods are 1, old robust methods 2 
-# and MICE variants 3
+# Creating a grouping variable for methods: 
+# proposed methods are 1, old robust methods 2 and MICE variants 3
 all_pooled_results2  <- all_pooled_results
 all_pooled_results2$Group <- 0
 
@@ -472,7 +751,6 @@ all_pooled_results2$Group <- as.factor(all_pooled_results2$Group)
 ```
 
 
-
 ## 2.1. General Plots
 
 ```{r}
@@ -491,13 +769,13 @@ method_names <- c(expression(MICE[default]),
                   "DRNNMI", 
                   "MRPMMI")
 
-# Assignining the colors for each method
+# Assigning the colors for each method
 method_colors <- c("#00AFBB", 
                    "#DDCC77", 
                    "#CC6677", 
                    "#AA4499",
                    "purple2", 
-                    "orange2",
+                   "orange2",
                    "sienna4",
                    "gray44",
                    "#999933",
@@ -585,8 +863,9 @@ plot_y1_final <- plot_y1 +
 
 plot_y1_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot_y1_final, height = 5, width = 8, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot_y1.pdf")
+ggsave(plot_y1_final, height = 5, width = 8, filename = file_name, dpi = 300)
 ```
 
 
@@ -660,8 +939,9 @@ plot_y2_final <- plot_y2 +
 
 plot_y2_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot_y2_final, height = 5, width = 8, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot_y2.pdf")
+ggsave(plot_y2_final, height = 5, width = 8, filename = file_name, dpi = 300)
 ```
 
 
@@ -734,8 +1014,9 @@ plot_y3_final <- plot_y3 +
 
 plot_y3_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot_y3_final, height = 5, width = 8, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot_y3.pdf")
+ggsave(plot_y3_final, height = 5, width = 8, filename = file_name, dpi = 300)
 ```
 
 
@@ -835,8 +1116,9 @@ plot_s2_y1_final <- plot_s2_y1 +
 
 plot_s2_y1_final
 
-# file_name <- paste0("F:\\...")
-# ggsave(plot_s2_y1_final, height = 5, width = 8, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot_s2_y1.pdf")
+ggsave(plot_s2_y1_final, height = 5, width = 8, filename = file_name, dpi = 300)
 ```
 
 
@@ -910,8 +1192,9 @@ plot_s2_y2_final <- plot_s2_y2 +
 
 plot_s2_y2_final
 
-# file_name <- paste0("F:\\...")
-# ggsave(plot_s2_y2_final, height = 5, width = 8, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot_s2_y2.pdf")
+ggsave(plot_s2_y2_final, height = 5, width = 8, filename = file_name, dpi = 300)
 ```
 
 ```{r}
@@ -983,8 +1266,9 @@ plot_s2_y3_final <- plot_s2_y3 +
 
 plot_s2_y3_final
 
-# file_name <- paste0("F:\\...")
-# ggsave(plot_s2_y3_final, height = 5, width = 8, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot_s2_y3.pdf")
+ggsave(plot_s2_y3_final, height = 5, width = 8, filename = file_name, dpi = 300)
 ```
 
 
@@ -992,8 +1276,8 @@ plot_s2_y3_final
 ## 2.3 Plots for Scenario 2 
 
 ```{r}
-# Load the file including the the combined results for the 5000 iterations
-file_name <- paste0("F:\\Thesis Project\\R code\\Main_draft\\all_combined_results.RData")
+# Load the file including the combined results for the 5000 iterations
+file_name <- paste0("C:...\all_combined_results.RData")
 load(file_name)
 ```
 
@@ -1059,8 +1343,9 @@ plot2_RR60_n50_s2_final <- plot2_RR60_n50_s2 +
 
 plot2_RR60_n50_s2_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot2_RR60_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot2_RR60_n50_s2.pdf")
+ggsave(plot2_RR60_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
 ```
 
 
@@ -1122,8 +1407,9 @@ plot2_RR70_n50_s2_final <- plot2_RR70_n50_s2 +
 
 plot2_RR70_n50_s2_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot2_RR70_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot2_RR70_n50_s2.pdf")
+ggsave(plot2_RR70_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
 ```
 
 
@@ -1158,7 +1444,7 @@ plot2_RR80_n50_s2  <- df_plot2_RR80_n50_s2  %>%
   geom_boxplot(alpha = .5) + 
   theme_classic() +
   coord_flip() +
-    scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+  scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
                                 expression(MRIC[R[CS]^2]),
                                 expression(MRIC[R[MZ]^2]),
                                 expression(MRIC[R[N]^2]),
@@ -1188,8 +1474,9 @@ plot2_RR80_n50_s2_final <- plot2_RR80_n50_s2 +
 
 plot2_RR80_n50_s2_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot2_RR80_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot2_RR80_n50_s2.pdf")
+ggsave(plot2_RR80_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
 ```
 
 
@@ -1253,8 +1540,9 @@ plot2_RR60_n500_s2_final <- plot2_RR60_n500_s2 +
 
 plot2_RR60_n500_s2_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot2_RR60_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot2_RR60_n500_s2.pdf")
+ggsave(plot2_RR60_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
 ```
 
 
@@ -1316,8 +1604,9 @@ plot2_RR70_n500_s2_final <- plot2_RR70_n500_s2 +
 
 plot2_RR70_n500_s2_final
 
-# file_name <- paste0("F:\\...")
-# ggsave(plot2_RR70_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot2_RR70_n500_s2.pdf")
+ggsave(plot2_RR70_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
 ```
 
 
@@ -1380,7 +1669,8 @@ plot2_RR80_n500_s2_final <- plot2_RR80_n500_s2 +
 
 plot2_RR80_n500_s2_final
 
-#file_name <- paste0("F:\\...")
-#ggsave(plot2_RR80_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+# Path where the figure is saved
+file_name <- paste0("C:\\...\\Plots\\plot2_RR80_n500_s2.pdf")
+ggsave(plot2_RR80_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
 ```
 
