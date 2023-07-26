@@ -20,11 +20,11 @@ The file incldues the main code for all the robust MI methods.
 
 5. pseudoR2.R
    
-The script incldues the supportive functinos to ocmpute four types of pseudo R<sup>2</sup>s that are needed for the method MRIC~R^2^~.
+The script incldues the supportive functinos to ocmpute four types of pseudo R2s that are needed for the method MRIC R2.
 
 6. Other_fun.R
     
-The file includes the following supportive functions that are needed for the simulation: a function to calcualte Akaike weights (needed for method MRIC~AIC~) a function to calcualte the Homser Lemeshow chi-square statistic (needed for MRIC~HL~}), a function to calculate the Euclidean distance between two units and a function to compute the pooled parameters (for any method if we have the imputed datasets).
+The file includes the following supportive functions that are needed for the simulation: a function to calcualte Akaike weights (needed for method MRIC AIC) a function to calcualte the Homser Lemeshow chi-square statistic (needed for MRIC HL}), a function to calculate the Euclidean distance between two units and a function to compute the pooled parameters (for any method if we have the imputed datasets).
 
 7. Results.Rmd
     
