@@ -1,0 +1,1005 @@
+---
+title: "Figures"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-07-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+# Figures
+
+```{r}
+pathway <- "C:\\...\\Project\\Plots"
+```
+
+
+```{r}
+# After all the pooled estimates have been saved, the files are looped to
+# combine them for the general figures.  
+
+# List for all the pooled parameters results
+all_pooled_results_list <- list()
+
+# File path in which all the pooled parameter files are located
+pooled_files <- list.files(path = "C:\\...\\Project\\results\\average pooled results",
+                           pattern = ".rds", full.names = T)
+
+iterno <- 1
+
+# looping each file
+for(file in pooled_files){
+  pooled_file <- readRDS(file)
+
+    all_pooled_results_list[[iterno]] <- pooled_file
+    iterno <- iterno + 1
+
+}
+
+```
+
+
+```{r}
+# Combining all the pooled results from the list
+all_pooled_results <- do.call(rbind, all_pooled_results_list)
+
+# Changing all categorical variables into factors
+all_pooled_results$level <- as.factor(all_pooled_results$level)
+all_pooled_results$method <- as.factor(all_pooled_results$method) 
+all_pooled_results$RR <- as.factor(all_pooled_results$RR)
+all_pooled_results$scenario <- as.factor(all_pooled_results$scenario) 
+
+```
+
+```{r}
+# Creating a grouping variable for methods: 
+# proposed methods are 1, old robust methods 2 and MICE variants 3
+all_pooled_results2  <- all_pooled_results
+all_pooled_results2$Group <- 0
+
+all_pooled_results2[all_pooled_results2$method == 1, 10] <- 1 
+all_pooled_results2[all_pooled_results2$method == 2, 10] <- 1 
+all_pooled_results2[all_pooled_results2$method == 3, 10] <- 1 
+all_pooled_results2[all_pooled_results2$method == 4, 10] <- 1 
+all_pooled_results2[all_pooled_results2$method == 5, 10] <- 1 
+all_pooled_results2[all_pooled_results2$method == 6, 10] <- 1 
+
+all_pooled_results2[all_pooled_results2$method == 7, 10] <- 2 
+all_pooled_results2[all_pooled_results2$method == 8, 10] <- 2 
+all_pooled_results2[all_pooled_results2$method == 9, 10] <- 2 
+
+all_pooled_results2[all_pooled_results2$method == 10, 10] <- 3 
+all_pooled_results2[all_pooled_results2$method == 11, 10] <- 3 
+all_pooled_results2[all_pooled_results2$method == 12, 10] <- 3 
+all_pooled_results2[all_pooled_results2$method == 13, 10] <- 3 
+
+all_pooled_results2$Group <- as.factor(all_pooled_results2$Group)
+
+```
+
+
+## 2.1. General Plots
+
+```{r}
+# Naming the methods for the outputs
+method_names <- c(expression(MICE[default]),
+                  expression(MICE[CM]),
+                  expression(MICE[INM]),
+                  expression(MICE[INNM]),
+                  expression(MRIC[R[MF]^2]),
+                  expression(MRIC[R[CS]^2]),
+                  expression(MRIC[R[MZ]^2]),
+                  expression(MRIC[R[N]^2]),
+                  expression(MRIC[AIC]),
+                  expression(MRIC[HL]),
+                  expression(MRNNMI),
+                  "DRNNMI", 
+                  "MRPMMI")
+
+# Assigning the colors for each method
+method_colors <- c("#00AFBB", 
+                   "#DDCC77", 
+                   "#CC6677", 
+                   "#AA4499",
+                   "purple2", 
+                   "orange2",
+                   "sienna4",
+                   "gray44",
+                   "#999933",
+                   "darkblue",
+                   "#882255",
+                   "#117733",
+                   "red3")
+```
+
+
+
+
+```{r}
+# General plot for the category 1 of Y 
+df_plot_y1 <- all_pooled_results2[all_pooled_results2$level == 1, ]
+
+df_plot_y1$level <- factor(df_plot_y1$level, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", 
+                                 "P(Y = 2) = .38", 
+                                 "P(Y = 3) = .52"))
+
+df_plot_y1$RR <- factor(df_plot_y1$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot_y1$scenario <- factor(df_plot_y1$scenario, 
+                      levels = c(1, 2, 3, 4, 5), 
+                      labels = c("Scenario 1", 
+                                 "Scenario 2", 
+                                 "Scenario 3", 
+                                 "Scenario 4", 
+                                 "Scenario 5"))
+
+df_plot_y1$Group <- factor(df_plot_y1$Group, 
+                      levels = c(1, 2, 3), 
+                      labels = c("MRIC Methods",
+                                 "Other Robust Methods",
+                                 "MICE Variants"))
+
+library(tidyverse)
+plot_y1 <- df_plot_y1 %>%
+  ggplot(aes(x = n, y = Est))+
+  geom_line(aes(color = method, group = method, linetype = 
+                  method %in% c("1", "2", "3", "4", "5", "6", "10", "11", 
+                                "12", "13"))) +
+  scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "solid")) +
+  geom_point(aes(color=method, shape = method, size = method))+
+   scale_shape_manual("MI Methods", 
+                      values=c(1, 1, 1, 1, 2, 2, 2, 2, 2, 2,  4, 4, 4),
+                      limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                        8, 9)),
+                      labels = method_names)+
+  scale_size_manual("MI Methods", values= c( 1, 1, 1, 1, 1.5, 1.5, 1.5, 1.5, 
+                                             1.5, 1.5, 1.5, 1.5, 1.5),
+                    limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                      8, 9)),
+                    labels = method_names)+
+  guides(linetype = "none") +
+  theme_classic()+
+  facet_grid(RR~scenario) + 
+  theme(legend.text.align = 0) +
+  xlab("n") +
+  ylab("AEP") +
+  ggtitle("") +
+    scale_colour_manual(name="MI Methods",
+                        values = method_colors,
+                        limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                          8, 9)),
+                        labels = method_names) +
+  xlim(0, 1050) + 
+  ylim(0.07, 0.18)
+
+hline_data <- data.frame(var = 1,
+                          hline = 0.10)
+
+hline_data$var <- factor(hline_data$var)
+levels(hline_data$var) <- c("P(Y = 1) = .10")
+
+
+  
+plot_y1_final <- plot_y1 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed",
+             size = 0.3)
+
+plot_y1_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway ,"\\plot_y1.pdf")
+ggsave(plot_y1_final, height = 5, width = 8, filename = file_name, dpi = 300)
+```
+
+
+
+```{r}
+# General plot for category 2 of Y
+df_plot_y2 <- all_pooled_results2[all_pooled_results2$level == 2, ]
+
+df_plot_y2$level <- factor(df_plot_y2$level, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", 
+                                 "P(Y = 2) = .38", 
+                                 "P(Y = 3) = .52"))
+
+df_plot_y2$RR <- factor(df_plot_y2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot_y2$scenario <- factor(df_plot_y2$scenario, 
+                      levels = c(1, 2, 3, 4, 5), 
+                      labels = c("Scenario 1", 
+                                 "Scenario 2", 
+                                 "Scenario 3", 
+                                 "Scenario 4", 
+                                 "Scenario 5"))
+
+library(tidyverse)
+plot_y2 <- df_plot_y2 %>%
+  ggplot(aes(x = n, y = Est))+
+  geom_line(aes(color = method, group = method, linetype = 
+                  method %in% c("1", "2", "3", "4", "5", "6", "10", "11", 
+                                "12", "13"))) +
+  scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "solid")) +
+  geom_point(aes(color=method, shape = method, size = method))+
+  scale_shape_manual("MI Methods", values=c(1, 1, 1, 1, 2, 2, 2, 2, 2, 2,  4, 
+                                             4, 4),
+                      limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                        8, 9)),
+                      labels = method_names)+
+  scale_size_manual("MI Methods", values=c( 1, 1, 1, 1, 1.5, 1.5, 1.5, 1.5, 
+                                            1.5, 1.5, 1.5, 1.5, 1.5),
+                    limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                      8, 9)),
+                    labels = method_names)+
+  guides(linetype = "none") +
+  theme_classic() +
+  facet_grid(RR~scenario) + 
+  theme(legend.text.align = 0) +
+  xlab("n") +
+  ylab("AEP") +
+  ggtitle("") +
+    scale_colour_manual(name="MI Methods",
+                        values = method_colors,
+                        limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                          8, 9)),
+                        labels = method_names) +
+  xlim(0, 1050) +
+  ylim(0.35, 0.48)
+
+hline_data <- data.frame(var = 1,
+                          hline = 0.38)
+
+hline_data$var <- factor(hline_data$var)
+levels(hline_data$var) <- c("P(Y = 2) = .38")
+
+
+  
+plot_y2_final <- plot_y2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed",
+             size = 0.3)
+
+plot_y2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "plot_y2.pdf")
+ggsave(plot_y2_final, height = 5, width = 8, filename = file_name, dpi = 300)
+```
+
+
+
+```{r}
+# General plot for category 3 of Y
+df_plot_y3 <- all_pooled_results2[all_pooled_results2$level == 3, ]
+
+df_plot_y3$level <- factor(df_plot_y3$level, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", 
+                                 "P(Y = 2) = .38", 
+                                 "P(Y = 3) = .52"))
+
+df_plot_y3$RR <- factor(df_plot_y3$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot_y3$scenario <- factor(df_plot_y3$scenario, 
+                      levels = c(1, 2, 3, 4, 5), 
+                      labels = c("Scenario 1", 
+                                 "Scenario 2", 
+                                 "Scenario 3", 
+                                 "Scenario 4", 
+                                 "Scenario 5"))
+
+library(tidyverse)
+plot_y3 <- df_plot_y3 %>%
+  ggplot(aes(x = n, y = Est))+
+  geom_line(aes(color = method, group = method, linetype = 
+                  method %in% c("1", "2", "3", "4", "5", "6", "10", "11", 
+                                "12", "13"))) +
+  scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "solid")) +
+  geom_point(aes(color=method, shape = method, size = method))+
+   scale_shape_manual("MI Methods", values=c(1, 1, 1, 1, 2, 2, 2, 2, 2, 2,  4, 
+                                             4, 4),
+                      limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                        8, 9)),
+                      labels = method_names)+
+  scale_size_manual("MI Methods", values=c( 1, 1, 1, 1, 1.5, 1.5, 1.5, 1.5, 
+                                            1.5, 1.5, 1.5, 1.5, 1.5),
+                    limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 
+                                      8, 9)),
+                    labels = method_names)+
+  guides(linetype = "none") +
+  theme_classic() +
+  facet_grid(RR~scenario) + 
+  theme(legend.text.align = 0) +
+  xlab("n") +
+  ylab("AEP") +
+  ggtitle("") +
+    scale_colour_manual(name="MI Methods",
+                        values = method_colors,
+                        limits = factor(c(10, 11, 12, 13, 1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                        labels = method_names) +
+  xlim(0, 1050) +
+  ylim(0.4, 0.55)
+
+hline_data <- data.frame(var = 1,
+                          hline = 0.52)
+
+hline_data$var <- factor(hline_data$var)
+levels(hline_data$var) <- c("P(Y = 3) = .52")
+
+
+  
+plot_y3_final <- plot_y3 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed",
+             size = 0.3)
+
+plot_y3_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "plot_y3.pdf")
+ggsave(plot_y3_final, height = 5, width = 8, filename = file_name, dpi = 300)
+```
+
+
+
+## 2.2 Plots for Appendix D
+
+
+```{r}
+method_names <- c(expression(MRIC[R[MF]^2]),
+                  expression(MRIC[R[CS]^2]),
+                  expression(MRIC[R[MZ]^2]),
+                  expression(MRIC[R[N]^2]),
+                  expression(MRIC[AIC]),
+                  expression(MRIC[HL]),
+                  expression(MRNNMI),
+                  "DRNNMI", 
+                  "MRPMMI")
+
+method_colors <- c("purple2", 
+                    "orange2",
+                   "sienna4",
+                   "gray44",
+                   "#999933",
+                   "darkblue",
+                   "#882255",
+                   "#117733",
+                   "red3")
+```
+
+
+```{r}
+df_plot_s2_y1 <- all_pooled_results2[all_pooled_results2$level == 1 &
+                                    all_pooled_results2$scenario == 2 &
+                                   all_pooled_results2$method == c(1, 2, 3, 4, 
+                                                                   5, 6, 7, 8, 
+                                                                   9),  ]
+
+df_plot_s2_y1$level <- factor(df_plot_s2_y1$level, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", 
+                                 "P(Y = 2) = .38", 
+                                 "P(Y = 3) = .52"))
+
+df_plot_s2_y1$RR <- factor(df_plot_s2_y1$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot_s2_y1$scenario <- factor(df_plot_s2_y1$scenario, 
+                      levels = c(1, 2, 3, 4, 5), 
+                      labels = c("Scenario 1", 
+                                 "Scenario 2", 
+                                 "Scenario 3", 
+                                 "Scenario 4", 
+                                 "Scenario 5"))
+
+
+library(tidyverse)
+plot_s2_y1 <- df_plot_s2_y1 %>%
+  ggplot(aes(x = n, y = Est))+
+  geom_line(aes(color = method, group = method, linetype = 
+                  method %in% c("1", "2", "3", "4", "5", "6", "10", "11", 
+                                "12", "13"))) +
+  scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "solid")) +
+  geom_point(aes(color=method, shape = method, size = method))+
+   scale_shape_manual("MI Methods", values=c(2, 2, 2, 2, 2, 2,  4, 4, 4),
+                      limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                      labels = method_names)+
+  scale_size_manual("MI Methods", values=c( 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,
+                                     1.5, 1.5, 1.5),
+                    limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                    labels = method_names)+
+  guides(linetype = "none") +
+  theme_classic()+
+  facet_grid(RR~scenario) + 
+  theme(legend.text.align = 0) +
+  xlab("n") +
+  ylab("AEP") +
+  ggtitle("") +
+    scale_colour_manual(name="MI Methods",
+                        values = method_colors,
+                        limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                        labels = method_names) +
+  xlim(0, 1050) 
+
+
+hline_data <- data.frame(var = 1,
+                          hline = 0.10)
+
+hline_data$var <- factor(hline_data$var)
+levels(hline_data$var) <- c("P(Y = 1) = .10")
+
+
+  
+plot_s2_y1_final <- plot_s2_y1 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed",
+             size = 0.3)
+
+plot_s2_y1_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot_s2_y1.pdf")
+ggsave(plot_s2_y1_final, height = 5, width = 8, filename = file_name, dpi = 300)
+```
+
+
+```{r}
+df_plot_s2_y2 <- all_pooled_results2[all_pooled_results2$level == 2 &
+                                    all_pooled_results2$scenario == 2 &
+                                   all_pooled_results2$method == c(1, 2, 3, 4, 
+                                                                   5, 6, 7, 8, 
+                                                                   9),  ]
+
+df_plot_s2_y2$level <- factor(df_plot_s2_y2$level, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", 
+                                 "P(Y = 2) = .38", 
+                                 "P(Y = 3) = .52"))
+
+df_plot_s2_y2$RR <- factor(df_plot_s2_y2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot_s2_y2$scenario <- factor(df_plot_s2_y2$scenario, 
+                      levels = c(1, 2, 3, 4, 5), 
+                      labels = c("Scenario 1", 
+                                 "Scenario 2", 
+                                 "Scenario 3", 
+                                 "Scenario 4", 
+                                 "Scenario 5"))
+
+
+library(tidyverse)
+plot_s2_y2 <- df_plot_s2_y2 %>%
+  ggplot(aes(x = n, y = Est))+
+  geom_line(aes(color = method, group = method, linetype = 
+                  method %in% c("1", "2", "3", "4", "5", "6", "10", "11", 
+                                "12", "13"))) +
+  scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "solid")) +
+  geom_point(aes(color=method, shape = method, size = method))+
+   scale_shape_manual("MI Methods", values=c(2, 2, 2, 2, 2, 2,  4, 4, 4),
+                      limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                      labels = method_names)+
+  scale_size_manual("MI Methods", values=c( 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,
+                                     1.5, 1.5, 1.5),
+                    limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                    labels = method_names)+
+  guides(linetype = "none") +
+  theme_classic()+
+  facet_grid(RR~scenario) + 
+  theme(legend.text.align = 0) +
+  xlab("n") +
+  ylab("AEP") +
+  ggtitle("") +
+    scale_colour_manual(name="MI Methods",
+                        values = method_colors,
+                        limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                        labels = method_names) +
+  xlim(0, 1050)
+
+
+
+hline_data <- data.frame(var = 1,
+                          hline = 0.38)
+
+hline_data$var <- factor(hline_data$var)
+levels(hline_data$var) <- c("P(Y = 1) = .38")
+
+
+  
+plot_s2_y2_final <- plot_s2_y2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed",
+             size = 0.3)
+
+plot_s2_y2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "plot_s2_y2.pdf")
+ggsave(plot_s2_y2_final, height = 5, width = 8, filename = file_name, dpi = 300)
+```
+
+```{r}
+df_plot_s2_y3 <- all_pooled_results2[all_pooled_results2$level == 3 &
+                                       all_pooled_results2$scenario == 2 &
+                                      all_pooled_results2$method == c(1, 2, 3, 4, 
+                                                                   5, 6, 7, 8, 
+                                                                   9),  ]
+
+df_plot_s2_y3$level <- factor(df_plot_s2_y3$level, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", 
+                                 "P(Y = 2) = .38", 
+                                 "P(Y = 3) = .52"))
+
+df_plot_s2_y3$RR <- factor(df_plot_s2_y3$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot_s2_y3$scenario <- factor(df_plot_s2_y3$scenario, 
+                      levels = c(1, 2, 3, 4, 5), 
+                      labels = c("Scenario 1", 
+                                 "Scenario 2", 
+                                 "Scenario 3", 
+                                 "Scenario 4", 
+                                 "Scenario 5"))
+
+
+library(tidyverse)
+plot_s2_y3 <- df_plot_s2_y3 %>%
+  ggplot(aes(x = n, y = Est))+
+  geom_line(aes(color = method, group = method, linetype = 
+                  method %in% c("1", "2", "3", "4", "5", "6", "10", "11", 
+                                "12", "13"))) +
+  scale_linetype_manual(values = c("TRUE" = "solid", "FALSE" = "solid")) +
+  geom_point(aes(color=method, shape = method, size = method))+
+   scale_shape_manual("MI Methods", values=c(2, 2, 2, 2, 2, 2,  4, 4, 4),
+                      limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                      labels = method_names)+
+  scale_size_manual("MI Methods", values=c( 1.5, 1.5, 1.5, 1.5, 1.5, 1.5,
+                                     1.5, 1.5, 1.5),
+                    limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                    labels = method_names)+
+  guides(linetype = "none") +
+  theme_classic()+
+  facet_grid(RR~scenario) + 
+  theme(legend.text.align = 0) +
+  xlab("n") +
+  ylab("AEP") +
+  ggtitle("") +
+    scale_colour_manual(name="MI Methods",
+                        values = method_colors,
+                        limits = factor(c(1, 2, 3, 4, 5, 6, 7, 8, 9)),
+                        labels = method_names) +
+  xlim(0, 1050)
+
+
+hline_data <- data.frame(var = 1,
+                          hline = 0.52)
+
+hline_data$var <- factor(hline_data$var)
+levels(hline_data$var) <- c("P(Y = 1) = .52")
+
+
+  
+plot_s2_y3_final <- plot_s2_y3 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed",
+             size = 0.3)
+
+plot_s2_y3_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot_s2_y3.pdf")
+ggsave(plot_s2_y3_final, height = 5, width = 8, filename = file_name, dpi = 300)
+```
+
+
+
+## 2.3 Plots for Scenario 2 
+
+```{r}
+# Load the file including the combined results for the 5000 iterations
+file_name <- paste0("C:\\...\\Project\\all_combined_results.RData")
+load(file_name)
+```
+
+
+### Plots for n = 50
+
+```{r}
+# Plot when n = 50 and RR = 60
+df_plot2_RR60_n50_s2 <- all_combined_results[all_combined_results$n == 50 &
+                                          all_combined_results$RR == 60 &
+                                            all_combined_results$scenario == 2,]
+
+
+df_plot2_RR60_n50_s2$RR <- factor(df_plot2_RR60_n50_s2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot2_RR60_n50_s2$var <- factor(df_plot2_RR60_n50_s2$var, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", "P(Y = 2) = .38", "P(Y = 3) = .52"))
+
+df_plot2_RR60_n50_s2$n <- factor(df_plot2_RR60_n50_s2$n, 
+                      levels = c(50, 100, 200, 500), 
+                      labels = c("n = 50", "n = 100", "n = 200", "n = 500"))
+
+
+library(dplyr)
+library(ggplot2)
+
+
+plot2_RR60_n50_s2  <- df_plot2_RR60_n50_s2  %>%
+  ggplot(aes(x = method, y = Est, fill = var)) + 
+  geom_boxplot(alpha = .5) + 
+  theme_classic() +
+  coord_flip() +
+    scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+                                expression(MRIC[R[CS]^2]),
+                                expression(MRIC[R[MZ]^2]),
+                                expression(MRIC[R[N]^2]),
+                                expression(MRIC[AIC]),
+                                expression(MRIC[HL]),
+                                expression(MRNNMI),
+                                "DRNNMI", 
+                                "MRPMMI",
+                                expression(MICE[default]),
+                                expression(MICE[CM]),
+                                expression(MICE[INM]),
+                                expression(MICE[INNM]))) +
+ theme(axis.text.y = element_text(hjust = 0)) +
+  xlab("") +
+  ylab("EP") + 
+  labs(fill = "Y Category") +
+  theme(legend.position='top')
+  
+
+hline_data <- data.frame(var = unique(df_plot2_RR60_n50_s2$var),
+                          hline = c(0.10036, 0.37615, 0.52349))
+
+
+
+plot2_RR60_n50_s2_final <- plot2_RR60_n50_s2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed")
+
+plot2_RR60_n50_s2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot2_RR60_n50_s2.pdf")
+ggsave(plot2_RR60_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+```
+
+
+```{r}
+# Plot when n = 50 and RR = 70
+df_plot2_RR70_n50_s2 <- all_combined_results[all_combined_results$n == 50 &
+                                          all_combined_results$RR == 70 &
+                                            all_combined_results$scenario == 2,]
+
+
+df_plot2_RR70_n50_s2$RR <- factor(df_plot2_RR70_n50_s2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot2_RR70_n50_s2$var <- factor(df_plot2_RR70_n50_s2$var, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", "P(Y = 2) = .38", "P(Y = 3) = .52"))
+
+df_plot2_RR70_n50_s2$n <- factor(df_plot2_RR70_n50_s2$n, 
+                      levels = c(50, 100, 200, 500), 
+                      labels = c("n = 50", "n = 100", "n = 200", "n = 500"))
+
+
+library(dplyr)
+library(ggplot2)
+
+plot2_RR70_n50_s2  <- df_plot2_RR70_n50_s2  %>%
+  ggplot(aes(x = method, y = Est, fill = var)) + 
+  geom_boxplot(alpha = .5) + 
+  theme_classic() +
+  coord_flip() +
+    scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+                                expression(MRIC[R[CS]^2]),
+                                expression(MRIC[R[MZ]^2]),
+                                expression(MRIC[R[N]^2]),
+                                expression(MRIC[AIC]),
+                                expression(MRIC[HL]),
+                                expression(MRNNMI),
+                                "DRNNMI", 
+                                "MRPMMI",
+                                expression(MICE[default]),
+                                expression(MICE[CM]),
+                                expression(MICE[INM]),
+                                expression(MICE[INNM]))) +
+ theme(axis.text.y = element_text(hjust = 0)) +
+  xlab("") +
+  ylab("EP") + 
+  labs(fill = "Y Category") +
+    theme(legend.position='top')
+  
+
+hline_data <- data.frame(var = unique(df_plot2_RR70_n50_s2$var),
+                          hline = c(0.10036, 0.37615, 0.52349))
+
+
+
+plot2_RR70_n50_s2_final <- plot2_RR70_n50_s2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed")
+
+plot2_RR70_n50_s2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot2_RR70_n50_s2.pdf")
+ggsave(plot2_RR70_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+```
+
+
+
+```{r}
+# Plot when n = 50 and RR = 80
+df_plot2_RR80_n50_s2 <- all_combined_results[all_combined_results$n == 50 &
+                                          all_combined_results$RR == 80 &
+                                            all_combined_results$scenario == 2,]
+
+
+df_plot2_RR80_n50_s2$RR <- factor(df_plot2_RR80_n50_s2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot2_RR80_n50_s2$var <- factor(df_plot2_RR80_n50_s2$var, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", "P(Y = 2) = .38", "P(Y = 3) = .52"))
+
+df_plot2_RR80_n50_s2$n <- factor(df_plot2_RR80_n50_s2$n, 
+                      levels = c(50, 100, 200, 500), 
+                      labels = c("n = 50", "n = 100", "n = 200", "n = 500"))
+
+
+library(dplyr)
+library(ggplot2)
+#png(file="robust_methods_plot.jpeg")
+
+
+plot2_RR80_n50_s2  <- df_plot2_RR80_n50_s2  %>%
+  ggplot(aes(x = method, y = Est, fill = var)) + 
+  geom_boxplot(alpha = .5) + 
+  theme_classic() +
+  coord_flip() +
+  scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+                                expression(MRIC[R[CS]^2]),
+                                expression(MRIC[R[MZ]^2]),
+                                expression(MRIC[R[N]^2]),
+                                expression(MRIC[AIC]),
+                                expression(MRIC[HL]),
+                                expression(MRNNMI),
+                                "DRNNMI", 
+                                "MRPMMI",
+                                expression(MICE[default]),
+                                expression(MICE[CM]),
+                                expression(MICE[INM]),
+                                expression(MICE[INNM]))) +
+ theme(axis.text.y = element_text(hjust = 0)) +
+  xlab("") +
+  ylab("EP") + 
+  labs(fill = "Y Category") +
+    theme(legend.position='top')
+  
+
+hline_data <- data.frame(var = unique(df_plot2_RR80_n50_s2$var),
+                          hline = c(0.10036, 0.37615, 0.52349))
+
+
+
+plot2_RR80_n50_s2_final <- plot2_RR80_n50_s2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed")
+
+plot2_RR80_n50_s2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot2_RR80_n50_s2.pdf")
+ggsave(plot2_RR80_n50_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+```
+
+
+### Plots for n = 500
+
+```{r}
+# Plot when n = 500 and RR = 60
+df_plot2_RR60_n500_s2 <- all_combined_results[all_combined_results$n == 500 &
+                                          all_combined_results$RR == 60 &
+                                          all_combined_results$scenario == 2,]
+
+
+df_plot2_RR60_n500_s2$RR <- factor(df_plot2_RR60_n500_s2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot2_RR60_n500_s2$var <- factor(df_plot2_RR60_n500_s2$var, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", "P(Y = 2) = .38", "P(Y = 3) = .52"))
+
+df_plot2_RR60_n500_s2$n <- factor(df_plot2_RR60_n500_s2$n, 
+                      levels = c(50, 100, 200, 500), 
+                      labels = c("n = 50", "n = 100", "n = 200", "n = 500"))
+
+
+library(dplyr)
+library(ggplot2)
+
+plot2_RR60_n500_s2  <- df_plot2_RR60_n500_s2  %>%
+  ggplot(aes(x = method, y = Est, fill = var)) + 
+  geom_boxplot(alpha = .5) + 
+  theme_classic() +
+  coord_flip() +
+    scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+                                expression(MRIC[R[CS]^2]),
+                                expression(MRIC[R[MZ]^2]),
+                                expression(MRIC[R[N]^2]),
+                                expression(MRIC[AIC]),
+                                expression(MRIC[HL]),
+                                expression(MRNNMI),
+                                "DRNNMI", 
+                                "MRPMMI",
+                                expression(MICE[default]),
+                                expression(MICE[CM]),
+                                expression(MICE[INM]),
+                                expression(MICE[INNM]))) +
+ theme(axis.text.y = element_text(hjust = 0)) +
+  xlab("") +
+  ylab("EP") + 
+  labs(fill = "Y Category") +
+  theme(legend.position='top')
+  
+
+hline_data <- data.frame(var = unique(df_plot2_RR60_n500_s2$var),
+                          hline = c(0.10036, 0.37615, 0.52349))
+
+
+
+plot2_RR60_n500_s2_final <- plot2_RR60_n500_s2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed")
+
+plot2_RR60_n500_s2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot2_RR60_n500_s2.pdf")
+ggsave(plot2_RR60_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+```
+
+
+```{r}
+# Plot when n = 500 and RR = 70
+df_plot2_RR70_n500_s2 <- all_combined_results[all_combined_results$n == 500 &
+                                          all_combined_results$RR == 70 & 
+                                            all_combined_results$scenario == 2,]
+
+
+df_plot2_RR70_n500_s2$RR <- factor(df_plot2_RR70_n500_s2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot2_RR70_n500_s2$var <- factor(df_plot2_RR70_n500_s2$var, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", "P(Y = 2) = .38", "P(Y = 3) = .52"))
+
+df_plot2_RR70_n500_s2$n <- factor(df_plot2_RR70_n500_s2$n, 
+                      levels = c(50, 100, 200, 500), 
+                      labels = c("n = 50", "n = 100", "n = 200", "n = 500"))
+
+
+library(dplyr)
+library(ggplot2)
+
+plot2_RR70_n500_s2  <- df_plot2_RR70_n500_s2  %>%
+  ggplot(aes(x = method, y = Est, fill = var)) + 
+  geom_boxplot(alpha = .5) + 
+  theme_classic() +
+  coord_flip() +
+    scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+                                expression(MRIC[R[CS]^2]),
+                                expression(MRIC[R[MZ]^2]),
+                                expression(MRIC[R[N]^2]),
+                                expression(MRIC[AIC]),
+                                expression(MRIC[HL]),
+                                expression(MRNNMI),
+                                "DRNNMI", 
+                                "MRPMMI",
+                                expression(MICE[default]),
+                                expression(MICE[CM]),
+                                expression(MICE[INM]),
+                                expression(MICE[INNM]))) +
+ theme(axis.text.y = element_text(hjust = 0)) +
+  xlab("") +
+  ylab("EP") + 
+  labs(fill = "Y Category") +
+    theme(legend.position='top')
+  
+
+hline_data <- data.frame(var = unique(df_plot2_RR70_n500_s2$var),
+                          hline = c(0.10036, 0.37615, 0.52349))
+
+
+
+plot2_RR70_n500_s2_final <- plot2_RR70_n500_s2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed")
+
+plot2_RR70_n500_s2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot2_RR70_n500_s2.pdf")
+ggsave(plot2_RR70_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+```
+
+
+
+```{r}
+# Plot when n = 500 and RR = 80
+df_plot2_RR80_n500_s2 <- all_combined_results[all_combined_results$n == 500 &
+                                          all_combined_results$RR == 80 &
+                                            all_combined_results$scenario == 2,]
+
+
+df_plot2_RR80_n500_s2$RR <- factor(df_plot2_RR80_n500_s2$RR, 
+                      levels = c(60, 70, 80), 
+                      labels = c("RR = 60", "RR = 70", "RR = 80"))
+
+df_plot2_RR80_n500_s2$var <- factor(df_plot2_RR80_n500_s2$var, 
+                      levels = c(1, 2, 3), 
+                      labels = c("P(Y = 1) = .10", "P(Y = 2) = .38", "P(Y = 3) = .52"))
+
+df_plot2_RR80_n500_s2$n <- factor(df_plot2_RR80_n500_s2$n, 
+                      levels = c(50, 100, 200, 500), 
+                      labels = c("n = 50", "n = 100", "n = 200", "n = 500"))
+
+
+library(dplyr)
+library(ggplot2)
+
+plot2_RR80_n500_s2  <- df_plot2_RR80_n500_s2  %>%
+  ggplot(aes(x = method, y = Est, fill = var)) + 
+  geom_boxplot(alpha = .5) + 
+  theme_classic() +
+  coord_flip() +
+    scale_x_discrete(labels = c(expression(MRIC[R[MF]^2]),
+                                expression(MRIC[R[CS]^2]),
+                                expression(MRIC[R[MZ]^2]),
+                                expression(MRIC[R[N]^2]),
+                                expression(MRIC[AIC]),
+                                expression(MRIC[HL]),
+                                expression(MRNNMI),
+                                "DRNNMI", 
+                                "MRPMMI",
+                                expression(MICE[default]),
+                                expression(MICE[CM]),
+                                expression(MICE[INM]),
+                                expression(MICE[INNM]))) +
+ theme(axis.text.y = element_text(hjust = 0)) +
+  xlab("") +
+  ylab("EP") + 
+  labs(fill = "Y Category") +
+    theme(legend.position='top')
+  
+
+hline_data <- data.frame(var = unique(df_plot2_RR80_n500_s2$var),
+                          hline = c(0.10036, 0.37615, 0.52349))
+
+
+
+plot2_RR80_n500_s2_final <- plot2_RR80_n500_s2 +
+  geom_hline(data = hline_data, aes(yintercept = hline), linetype = "dashed")
+
+plot2_RR80_n500_s2_final
+
+# Path where the figure is saved
+file_name <- paste0(pathway, "\\plot2_RR80_n500_s2.pdf")
+ggsave(plot2_RR80_n500_s2_final, height = 6, width = 6, filename = file_name, dpi = 300)
+```
