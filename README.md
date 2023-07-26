@@ -20,7 +20,7 @@ The file incldues the main code for all the robust MI methods.
 
 5. pseudoR2.R
    
-The script incldues the supportive functinos to ocmpute four types of pseudo R^2^s that are needed for the method MRIC~R^2^~.
+The script incldues the supportive functinos to ocmpute four types of pseudo R<sup>2</sup>s that are needed for the method MRIC~R^2^~.
 
 6. Other_fun.R
     
