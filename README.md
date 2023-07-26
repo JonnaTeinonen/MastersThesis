@@ -1,4 +1,4 @@
-# MastersThesis
+# Master Thesis: Multiply Robust Imputation for Missing Categorical Data: The Impact of Weighting Methods
 
 This repository contains the code for my master thesis "Multiply Robust Imputation for Missing Categorical Data: The Impact of Weighting Methods". Please, see below detailed information about each file.
 
