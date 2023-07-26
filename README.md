@@ -28,4 +28,9 @@ The file includes the following supportive functions that are needed for the sim
 
 7. Results.Rmd
     
-The file includes the code for the statistical analyses (to compute average estimated proportion etc.) and to obtain the figures that were used in the master thesis.
+The file includes the code for the statistical analyses: calculatino of AEP, ASE, SD and CR.
+
+8. Figure.Rmd
+The file contains the code to generate the figures that were used in the thesis.
+
+
