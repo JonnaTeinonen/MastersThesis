@@ -8,24 +8,24 @@ The includes the code to study the influence of the generated explanatory variab
 
 2. simulation_code_main.Rmd
    
-The file includes the code for generating the population and the functions to generate the data for all the conditions using the MI methods. In order for the simulation functions to work, supportice functions from the R scripts "simulation_fun.R", "MI_methods.R", "pseudoR2.R" and "Other_fun.R" are neede.
+The file includes the code for generating the population and the functions to generate the data for all the conditions using the MI methods. In order for the simulation functions to work, supportive functions from the R scripts "simulation_fun.R", "MI_methods.R", "pseudoR2.R" and "Other_fun.R" are needed.
 
 3. simulation_fun.R
    
-The script includes the main functions for the simulation (called in the file "simulation_code_main.Rmd") that are run in parallel when simulating the data by using the MI methods. In addition, the script includes functions to compute the the pooled parameters for each MI method.
+The script includes the main functions for the simulation (called in the file "simulation_code_main.Rmd") that are run in parallel when simulating the data by using the MI methods. In addition, the script includes functions to compute the pooled parameters for each MI method.
 
 4. MI_methods.R
    
-The file incldues the main code for all the robust MI methods.
+The file includes the main code for all the robust MI methods.
 
 5. pseudoR2.R
    
-The script incldues the supportive functinos to ocmpute four types of pseudo R2s that are needed for the method MRIC R2.
+The script incldues the supportive functions to compute four types of pseudo R2s that are needed for the method MRIC R2.
 
 6. Other_fun.R
     
-The file includes the following supportive functions that are needed for the simulation: a function to calcualte Akaike weights (needed for method MRIC AIC) a function to calcualte the Homser Lemeshow chi-square statistic (needed for MRIC HL}), a function to calculate the Euclidean distance between two units and a function to compute the pooled parameters (for any method if we have the imputed datasets).
+The file includes the following supportive functions that are needed for the simulation: a function to calculate Akaike weights (needed for method MRIC AIC) a function to calculate the Hosmer Lemeshow chi-square test statistic (needed for MRIC HL), a function to calculate the Euclidean distance between two units and a function to compute the pooled parameters (for any method if we have the imputed dataset(s)).
 
 7. Results.Rmd
     
-The file includes the code for the statistical analyses (compute average estimated proportion etc.) and to obtain the figures that were used in the master thesis.
+The file includes the code for the statistical analyses (to compute average estimated proportion etc.) and to obtain the figures that were used in the master thesis.
